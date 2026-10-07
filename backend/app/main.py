@@ -2523,7 +2523,7 @@ async def global_exception_handler(
 if __name__ == "__main__":
 
     import uvicorn
-
+    
     print("=" * 60)
     print("ResumeAI FastAPI Backend")
     print("=" * 60)
@@ -2543,24 +2543,24 @@ if __name__ == "__main__":
 
     print(
         "Server: "
-        "http://127.0.0.1:5000"
+        "http://10.30.98.18:5000"
     )
 
     print(
         "Swagger Docs: "
-        "http://127.0.0.1:5000/docs"
+        "http://10.30.98.18:5000",
     )
 
     print(
         "Health: "
-        "http://127.0.0.1:5000/api/health"
+        "http://10.30.98.18:5000",
     )
 
     print("=" * 60)
 
     uvicorn.run(
     app,
-    host="127.0.0.1",
+    host="10.30.98.18",
     port=5000,
     reload=False
 )
