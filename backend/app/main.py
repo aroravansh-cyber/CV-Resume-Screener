@@ -1,12 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-app = FastAPI(
-    title = "Hackathon AI API",
-    description="Hackathon backend",
-    version="1.0.0"
-)
 
-#cros = croos origin resources sharing
+app = FastAPI(title="Fair CV Screener")
 
 app.add_middleware(
     CORSMiddleware,
@@ -18,13 +13,8 @@ app.add_middleware(
 
 @app.get("/")
 def root():
-    return {
-        "message":"Hackathon Ai Backend is running"
-    }
+    return {"message": "Fair CV Screener API is running"}
 
-@app.get("/api/health",tags=["Health"])
+@app.get("/api/health")
 def health():
-    return {
-        "status": "healthy",
-        "message": "backend is running"
-    }
+    return {"status": "ok"}
