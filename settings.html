@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings · ResumeAI</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body data-page="settings">
+  <div class="app">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <div class="main">
+      <header class="topbar">
+        <div class="user-chip"><span class="avatar" id="userAvatar">R</span><span id="userName">Recruiter</span></div>
+      </header>
+
+      <main class="content">
+        <h1 class="page-title">Settings</h1>
+        <p class="page-subtitle">Preferences are saved in this browser.</p>
+
+        <div id="settingsMessage" class="hidden"></div>
+
+        <section class="card settings-section">
+          <h2>Profile</h2>
+          <div class="form-grid">
+            <div><label class="field-label" for="setName">Name</label><input type="text" id="setName" autocomplete="name"></div>
+            <div><label class="field-label" for="setEmail">Email</label><input type="email" id="setEmail" autocomplete="email"></div>
+          </div>
+        </section>
+
+        <section class="card settings-section">
+          <h2>Screening Settings</h2>
+          <div class="setting-row">
+            <div><div class="setting-name">Minimum Match Score</div><div class="setting-help">Sent to the backend with each screening.</div></div>
+            <div class="setting-control range-wrap">
+              <input type="range" id="minScore" min="0" max="100" step="5" value="60">
+              <span class="range-value" id="minScoreValue">60%</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-name">Skill Matching Sensitivity</div><div class="setting-help">How strictly skills should be matched.</div></div>
+            <div class="setting-control">
+              <select id="sensitivity">
+                <option value="low">Low</option>
+                <option value="balanced">Balanced</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-name">Enable AI Explanation</div><div class="setting-help">Ask the backend to explain each match.</div></div>
+            <label class="switch"><input type="checkbox" id="aiExplanation"><span class="slider"></span></label>
+          </div>
+        </section>
+
+        <section class="card settings-section">
+          <h2>File Settings</h2>
+          <div class="setting-row">
+            <div><div class="setting-name">Maximum CV File Size</div><div class="setting-help">In megabytes, per file.</div></div>
+            <div class="setting-control"><input type="number" id="maxFileMB" min="1" max="100" step="1"></div>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-name">Allowed CV Formats</div></div>
+            <div class="check-group">
+              <label class="check-pill"><input type="checkbox" name="format" value="pdf"><span>PDF</span></label>
+              <label class="check-pill"><input type="checkbox" name="format" value="doc"><span>DOC</span></label>
+              <label class="check-pill"><input type="checkbox" name="format" value="docx"><span>DOCX</span></label>
+              <label class="check-pill"><input type="checkbox" name="format" value="jpg"><span>JPG</span></label>
+              <label class="check-pill"><input type="checkbox" name="format" value="jpeg"><span>JPEG</span></label>
+              <label class="check-pill"><input type="checkbox" name="format" value="png"><span>PNG</span></label>
+            </div>
+          </div>
+        </section>
+
+        <section class="card settings-section">
+          <h2>Appearance</h2>
+          <div class="theme-options">
+            <label class="theme-option"><input type="radio" name="theme" value="light"><span>Light Mode</span></label>
+            <label class="theme-option"><input type="radio" name="theme" value="dark"><span>Dark Mode</span></label>
+          </div>
+        </section>
+
+        <section class="card settings-section">
+          <h2>Notifications</h2>
+          <div class="setting-row">
+            <div><div class="setting-name">Screening Completed</div></div>
+            <label class="switch"><input type="checkbox" id="notifyComplete"><span class="slider"></span></label>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-name">Processing Errors</div></div>
+            <label class="switch"><input type="checkbox" id="notifyErrors"><span class="slider"></span></label>
+          </div>
+        </section>
+
+        <div class="settings-actions">
+          <button type="button" class="btn" id="resetBtn">Reset</button>
+          <button type="button" class="btn btn-primary" id="saveBtn">Save Changes</button>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

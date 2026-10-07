@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Candidate Review · ResumeAI</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body data-page="candidate">
+  <div class="app">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <div class="main">
+      <header class="topbar">
+        <div class="user-chip"><span class="avatar" id="userAvatar">R</span><span id="userName">Recruiter</span></div>
+      </header>
+
+      <main class="content">
+        <div id="reviewContent">
+          <div class="review-top">
+            <a href="summary.html" class="back-link"><i data-icon="arrow-left"></i> Summary</a>
+            <span class="counter" id="candCounter">Candidate</span>
+            <span style="width:70px"></span>
+          </div>
+
+          <div id="reviewMessage" class="hidden"></div>
+
+          <div class="stack">
+            <!-- Profile -->
+            <section class="card profile-card">
+              <div class="profile-avatar" id="candAvatar">?</div>
+              <div class="profile-main">
+                <div class="profile-name" id="candName">Candidate Name</div>
+                <div class="profile-role" id="candRole">Job Role</div>
+                <div class="profile-meta">
+                  <span><i data-icon="briefcase"></i> Experience: <strong id="candExperience">—</strong></span>
+                  <span><i data-icon="pin"></i> Location: <strong id="candLocation">—</strong></span>
+                </div>
+              </div>
+              <div class="score-ring" id="scoreRing">
+                <div class="score-inner"><span class="score-value" id="candScore">—</span><span class="score-label">Match Score</span></div>
+              </div>
+            </section>
+
+            <!-- Skills -->
+            <div class="grid-2">
+              <section class="card">
+                <div class="section-title">Matched Skills <span class="count" id="matchedCount"></span></div>
+                <div class="chips" id="matchedSkills"><span class="empty-inline">Waiting for results.</span></div>
+              </section>
+              <section class="card">
+                <div class="section-title">Missing Skills <span class="count" id="missingCount"></span></div>
+                <div class="chips" id="missingSkills"><span class="empty-inline">Waiting for results.</span></div>
+              </section>
+            </div>
+
+            <!-- Experience + explanation -->
+            <div class="grid-2">
+              <section class="card">
+                <div class="section-title">Experience</div>
+                <p class="explain-text" id="expSummary">—</p>
+              </section>
+              <section class="card explain-card">
+                <div class="section-title"><i data-icon="sparkle"></i> AI Explanation</div>
+                <p class="explain-text" id="aiExplanation">—</p>
+              </section>
+            </div>
+
+            <div class="action-row">
+              <button type="button" class="btn" id="prevBtn" disabled><i data-icon="arrow-left"></i> Previous Candidate</button>
+              <button type="button" class="btn" id="resumeBtn" disabled><i data-icon="file"></i> View Resume</button>
+              <button type="button" class="btn btn-primary" id="nextBtn">Next Candidate <i data-icon="arrow-right"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <section class="card hidden" id="noScreening">
+          <div class="empty-state">
+            <p>There are no screening results to review.</p>
+            <p style="margin-top:14px"><a href="index.html" class="btn btn-primary">Start New Screening</a></p>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+</body>
+</html>
