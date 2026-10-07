@@ -1,6 +1,6 @@
 # ============================================================
 # ResumeAI - FastAPI Backend
-# Complete replacement for main.py
+# COMPLETE REPLACEMENT main.py
 # ============================================================
 
 from fastapi import (
@@ -22,7 +22,6 @@ import threading
 import re
 import subprocess
 import traceback
-import os
 
 
 # ============================================================
@@ -40,9 +39,11 @@ except ImportError:
     Document = None
 
 try:
-    from PIL import Image
+    from PIL import Image, ImageEnhance, ImageFilter
 except ImportError:
     Image = None
+    ImageEnhance = None
+    ImageFilter = None
 
 try:
     import pytesseract
@@ -51,18 +52,16 @@ except ImportError:
 
 
 # ============================================================
-# APP CONFIGURATION
+# CONFIGURATION
 # ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent
 
 UPLOAD_DIR = BASE_DIR / "uploads"
-UPLOAD_DIR.mkdir(
-    parents=True,
-    exist_ok=True
-)
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 MAX_FILE_MB = 10
+MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024
 
 ALLOWED_EXTENSIONS = {
     "pdf",
@@ -75,15 +74,13 @@ ALLOWED_EXTENSIONS = {
 
 
 # ============================================================
-# FASTAPI APP
+# FASTAPI
 # ============================================================
 
 app = FastAPI(
     title="ResumeAI API",
-    description=(
-        "AI-powered CV / Resume Screening API"
-    ),
-    version="1.0.0",
+    description="AI-powered Resume Screening API",
+    version="3.0.0",
 )
 
 
@@ -101,7 +98,7 @@ app.add_middleware(
 
 
 # ============================================================
-# IN-MEMORY DATABASE
+# MEMORY STORAGE
 # ============================================================
 
 screenings: Dict[str, Dict[str, Any]] = {}
@@ -156,7 +153,7 @@ SKILL_DATABASE = {
     "restful api",
     "graphql",
 
-    # Databases
+    # Database
     "mysql",
     "postgresql",
     "postgres",
@@ -168,7 +165,7 @@ SKILL_DATABASE = {
     "sql",
     "nosql",
 
-    # Cloud / DevOps
+    # Cloud
     "aws",
     "amazon web services",
     "azure",
@@ -176,10 +173,15 @@ SKILL_DATABASE = {
     "gcp",
     "docker",
     "kubernetes",
+
+    # DevOps
     "linux",
     "bash",
     "jenkins",
     "ci/cd",
+    "git",
+    "github",
+    "gitlab",
 
     # AI / ML
     "artificial intelligence",
@@ -206,7 +208,7 @@ SKILL_DATABASE = {
     "hugging face",
     "yolo",
 
-    # Data
+    # Visualization
     "matplotlib",
     "seaborn",
     "power bi",
@@ -219,11 +221,6 @@ SKILL_DATABASE = {
     "android development",
     "ios",
     "react native",
-
-    # Git
-    "git",
-    "github",
-    "gitlab",
 
     # Testing
     "pytest",
@@ -244,6 +241,81 @@ SKILL_DATABASE = {
 
 
 # ============================================================
+# SKILL ALIASES
+# ============================================================
+
+SKILL_ALIASES = {
+    "python3": "python",
+    "python 3": "python",
+
+    "js": "javascript",
+    "javascript es6": "javascript",
+
+    "ts": "typescript",
+
+    "reactjs": "react",
+    "react js": "react",
+
+    "angularjs": "angular",
+
+    "vuejs": "vue",
+    "vue js": "vue",
+
+    "nextjs": "next.js",
+    "next js": "next.js",
+
+    "node": "node.js",
+    "nodejs": "node.js",
+    "node js": "node.js",
+
+    "expressjs": "express",
+    "express js": "express",
+
+    "fast api": "fastapi",
+    "fast-api": "fastapi",
+
+    "postgres": "postgresql",
+    "postgres db": "postgresql",
+    "postgres database": "postgresql",
+    "postgre sql": "postgresql",
+    "postgreSQL": "postgresql",
+
+    "mongo": "mongodb",
+    "mongo db": "mongodb",
+
+    "google cloud platform": "google cloud",
+
+    "gcp": "google cloud",
+
+    "aws cloud": "aws",
+
+    "ml": "machine learning",
+
+    "ai/ml": "machine learning",
+
+    "artificial intelligence": "artificial intelligence",
+
+    "sklearn": "scikit-learn",
+    "scikit learn": "scikit-learn",
+
+    "tensorflow 2": "tensorflow",
+
+    "pytorch": "pytorch",
+
+    "cv": "computer vision",
+
+    "nlp": "natural language processing",
+
+    "powerbi": "power bi",
+
+    "power-bi": "power bi",
+
+    "problem solving": "problem solving",
+    "problem-solving": "problem solving",
+}
+
+
+# ============================================================
 # ROLE KEYWORDS
 # ============================================================
 
@@ -252,24 +324,19 @@ ROLE_KEYWORDS = {
         "software engineer",
         "software developer",
         "software development",
-        "backend developer",
-        "frontend developer",
-        "full stack developer",
-        "full-stack developer",
+        "software engineering",
     ],
 
     "data scientist": [
         "data scientist",
         "data science",
-        "machine learning",
-        "statistics",
         "predictive modeling",
     ],
 
     "machine learning engineer": [
         "machine learning engineer",
-        "machine learning",
         "ml engineer",
+        "machine learning",
         "deep learning",
         "model development",
     ],
@@ -329,146 +396,128 @@ class CreateScreeningRequest(BaseModel):
 
 
 # ============================================================
-# UTILITY FUNCTIONS
+# BASIC HELPERS
 # ============================================================
 
 def generate_id() -> str:
     return uuid.uuid4().hex[:12]
 
 
-def allowed_file(filename: str) -> bool:
-    if not filename:
-        return False
-
-    if "." not in filename:
-        return False
-
-    extension = filename.rsplit(
-        ".",
-        1
-    )[1].lower()
-
-    return extension in ALLOWED_EXTENSIONS
-
-
 def get_extension(filename: str) -> str:
-    if "." not in filename:
+    if not filename or "." not in filename:
         return ""
 
-    return filename.rsplit(
-        ".",
-        1
-    )[1].lower()
+    return filename.rsplit(".", 1)[1].lower()
+
+
+def allowed_file(filename: str) -> bool:
+    return get_extension(filename) in ALLOWED_EXTENSIONS
+
+
+def safe_float(value, default=0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def clamp(
+    value: float,
+    minimum: float = 0,
+    maximum: float = 100,
+) -> float:
+
+    return max(
+        minimum,
+        min(maximum, value),
+    )
 
 
 def clean_text(text: str) -> str:
+
     if not text:
         return ""
 
-    text = text.replace(
-        "\x00",
-        " "
-    )
+    text = text.replace("\x00", " ")
 
     text = re.sub(
         r"\r\n?",
         "\n",
-        text
+        text,
     )
 
     text = re.sub(
         r"[ \t]+",
         " ",
-        text
+        text,
     )
 
     text = re.sub(
         r"\n{3,}",
         "\n\n",
-        text
+        text,
     )
 
     return text.strip()
 
 
 def normalize_for_search(text: str) -> str:
+
     if not text:
         return ""
 
-    text = text.lower()
+    text = str(text).lower()
 
-    text = text.replace(
-        "–",
-        "-"
+    text = text.replace("–", "-")
+    text = text.replace("—", "-")
+    text = text.replace("•", " ")
+
+    text = re.sub(
+        r"\s+",
+        " ",
+        text,
     )
 
-    text = text.replace(
-        "—",
-        "-"
-    )
-
-    return text
+    return text.strip()
 
 
-def safe_float(
-    value,
-    default=0
-) -> float:
+def canonical_skill(skill: str) -> str:
 
-    try:
-        return float(value)
+    skill = normalize_for_search(skill)
 
-    except (
-        TypeError,
-        ValueError
-    ):
-        return default
+    if not skill:
+        return ""
 
+    if skill in SKILL_ALIASES:
+        skill = SKILL_ALIASES[skill]
 
-def clamp(
-    value,
-    minimum=0,
-    maximum=100
-):
-    return max(
-        minimum,
-        min(
-            maximum,
-            value
-        )
-    )
+    return normalize_for_search(skill)
 
 
 # ============================================================
 # PDF EXTRACTION
 # ============================================================
 
-def extract_pdf_text(
-    file_path: Path
-) -> str:
+def extract_pdf_text(file_path: Path) -> str:
 
     if PdfReader is None:
+        print("[WARNING] PyPDF2 is not installed.")
         return ""
 
     try:
-        reader = PdfReader(
-            str(file_path)
-        )
+
+        reader = PdfReader(str(file_path))
 
         pages = []
 
         for page in reader.pages:
 
             try:
-                text = (
-                    page.extract_text()
-                    or ""
-                )
+                page_text = page.extract_text() or ""
+                pages.append(page_text)
 
-                pages.append(text)
-
-            except Exception:
-                continue
+            except Exception as exc:
+                print(f"[PDF PAGE ERROR] {exc}")
 
         return clean_text(
             "\n".join(pages)
@@ -476,10 +525,7 @@ def extract_pdf_text(
 
     except Exception as exc:
 
-        print(
-            f"[PDF ERROR] {exc}"
-        )
-
+        print(f"[PDF ERROR] {exc}")
         return ""
 
 
@@ -487,28 +533,23 @@ def extract_pdf_text(
 # DOCX EXTRACTION
 # ============================================================
 
-def extract_docx_text(
-    file_path: Path
-) -> str:
+def extract_docx_text(file_path: Path) -> str:
 
     if Document is None:
+        print("[WARNING] python-docx is not installed.")
         return ""
 
     try:
-        document = Document(
-            str(file_path)
-        )
+
+        document = Document(str(file_path))
 
         parts = []
 
         for paragraph in document.paragraphs:
 
             if paragraph.text:
-                parts.append(
-                    paragraph.text
-                )
+                parts.append(paragraph.text)
 
-        # Tables
         for table in document.tables:
 
             for row in table.rows:
@@ -518,9 +559,7 @@ def extract_docx_text(
                 for cell in row.cells:
 
                     if cell.text:
-                        values.append(
-                            cell.text
-                        )
+                        values.append(cell.text)
 
                 if values:
                     parts.append(
@@ -533,31 +572,26 @@ def extract_docx_text(
 
     except Exception as exc:
 
-        print(
-            f"[DOCX ERROR] {exc}"
-        )
-
+        print(f"[DOCX ERROR] {exc}")
         return ""
 
 
 # ============================================================
-# DOC EXTRACTION
+# OLD DOC EXTRACTION
 # ============================================================
 
-def extract_doc_text(
-    file_path: Path
-) -> str:
+def extract_doc_text(file_path: Path) -> str:
 
     try:
 
         result = subprocess.run(
             [
                 "antiword",
-                str(file_path)
+                str(file_path),
             ],
             capture_output=True,
             text=True,
-            timeout=20
+            timeout=20,
         )
 
         if result.returncode == 0:
@@ -569,6 +603,11 @@ def extract_doc_text(
     except Exception:
         pass
 
+    print(
+        "[WARNING] Could not extract .doc file. "
+        "Install antiword or convert .doc to .docx."
+    )
+
     return ""
 
 
@@ -576,45 +615,68 @@ def extract_doc_text(
 # IMAGE OCR
 # ============================================================
 
-def extract_image_text(
-    file_path: Path
-) -> str:
+def extract_image_text(file_path: Path) -> str:
 
-    if (
-        Image is None
-        or pytesseract is None
-    ):
+    if Image is None:
+        print("[WARNING] Pillow is not installed.")
+        return ""
+
+    if pytesseract is None:
+        print("[WARNING] pytesseract is not installed.")
         return ""
 
     try:
 
-        image = Image.open(
-            file_path
-        )
+        image = Image.open(file_path)
+
+        if image.mode != "RGB":
+            image = image.convert("RGB")
+
+        try:
+
+            image = image.resize(
+                (
+                    image.width * 2,
+                    image.height * 2,
+                )
+            )
+
+            if ImageEnhance:
+
+                image = (
+                    ImageEnhance.Contrast(
+                        image
+                    ).enhance(1.5)
+                )
+
+            if ImageFilter:
+
+                image = image.filter(
+                    ImageFilter.SHARPEN
+                )
+
+        except Exception:
+            pass
 
         text = pytesseract.image_to_string(
-            image
+            image,
+            config="--psm 6",
         )
 
-        return clean_text(
-            text
-        )
+        return clean_text(text)
 
     except Exception as exc:
 
-        print(
-            f"[OCR ERROR] {exc}"
-        )
-
+        print(f"[OCR ERROR] {exc}")
         return ""
 
 
 # ============================================================
-# RESUME TEXT EXTRACTION
+# GENERAL RESUME EXTRACTION
 # ============================================================
 
 def extract_resume_text(
-    file_path: Path
+    file_path: Path,
 ) -> str:
 
     extension = get_extension(
@@ -622,28 +684,20 @@ def extract_resume_text(
     )
 
     if extension == "pdf":
-        return extract_pdf_text(
-            file_path
-        )
+        return extract_pdf_text(file_path)
 
     if extension == "docx":
-        return extract_docx_text(
-            file_path
-        )
+        return extract_docx_text(file_path)
 
     if extension == "doc":
-        return extract_doc_text(
-            file_path
-        )
+        return extract_doc_text(file_path)
 
     if extension in {
         "jpg",
         "jpeg",
-        "png"
+        "png",
     }:
-        return extract_image_text(
-            file_path
-        )
+        return extract_image_text(file_path)
 
     return ""
 
@@ -652,55 +706,96 @@ def extract_resume_text(
 # SKILL EXTRACTION
 # ============================================================
 
-def extract_skills(
-    text: str
-) -> List[str]:
+def extract_skills(text: str) -> List[str]:
 
-    normalized = normalize_for_search(
-        text
-    )
+    normalized = normalize_for_search(text)
 
-    found = set()
+    if not normalized:
+        return []
 
-    skills = sorted(
-        SKILL_DATABASE,
-        key=len,
-        reverse=True
-    )
+    found: Dict[str, str] = {}
 
-    for skill in skills:
+    # Check canonical database skills
+    for skill in SKILL_DATABASE:
 
-        normalized_skill = (
-            normalize_for_search(
-                skill
-            )
-        )
+        canonical = canonical_skill(skill)
 
-        if not normalized_skill:
+        if not canonical:
             continue
 
+        # Convert special characters to safe regex
         pattern = (
-            r"(?<![a-z0-9+#])"
-            + re.escape(
-                normalized_skill
-            )
-            + r"(?![a-z0-9+#])"
+            r"(?<![a-z0-9])"
+            + re.escape(canonical)
+            + r"(?![a-z0-9])"
         )
 
         try:
 
             if re.search(
                 pattern,
-                normalized
+                normalized,
+                re.IGNORECASE,
             ):
-                found.add(skill)
+
+                found[canonical] = skill
 
         except re.error:
 
-            if normalized_skill in normalized:
-                found.add(skill)
+            if canonical in normalized:
+                found[canonical] = skill
 
-    return sorted(found)
+    # Check aliases explicitly
+    for alias, canonical in SKILL_ALIASES.items():
+
+        alias_normalized = normalize_for_search(
+            alias
+        )
+
+        canonical_normalized = canonical_skill(
+            canonical
+        )
+
+        if not alias_normalized:
+            continue
+
+        pattern = (
+            r"(?<![a-z0-9])"
+            + re.escape(alias_normalized)
+            + r"(?![a-z0-9])"
+        )
+
+        try:
+
+            if re.search(
+                pattern,
+                normalized,
+                re.IGNORECASE,
+            ):
+
+                # Find canonical display name
+                display = canonical_normalized
+
+                for database_skill in SKILL_DATABASE:
+
+                    if canonical_skill(
+                        database_skill
+                    ) == canonical_normalized:
+
+                        display = database_skill
+                        break
+
+                found[
+                    canonical_normalized
+                ] = display
+
+        except re.error:
+            pass
+
+    return sorted(
+        set(found.values()),
+        key=lambda value: value.lower(),
+    )
 
 
 # ============================================================
@@ -709,7 +804,7 @@ def extract_skills(
 
 def extract_name(
     text: str,
-    filename: str = ""
+    filename: str = "",
 ) -> str:
 
     lines = [
@@ -718,32 +813,41 @@ def extract_name(
         if line.strip()
     ]
 
-    # Explicit name
-    for line in lines[:20]:
+    explicit_patterns = [
+        r"^(?:name|candidate name|full name)"
+        r"\s*[:\-]\s*(.+)$",
 
-        match = re.match(
-            r"^(?:name|candidate name)"
-            r"\s*[:\-]\s*(.+)$",
-            line,
-            re.IGNORECASE
-        )
+        r"^(?:candidate)"
+        r"\s*[:\-]\s*(.+)$",
+    ]
 
-        if match:
+    for line in lines[:30]:
 
-            name = (
-                match.group(1)
-                .strip()
+        for pattern in explicit_patterns:
+
+            match = re.match(
+                pattern,
+                line,
+                re.IGNORECASE,
             )
 
-            if 2 <= len(
-                name.split()
-            ) <= 6:
+            if match:
 
-                return name
+                name = match.group(1).strip()
+
+                name = re.sub(
+                    r"\s{2,}",
+                    " ",
+                    name,
+                )
+
+                if 2 <= len(name.split()) <= 6:
+                    return name
 
     blocked_words = {
         "resume",
-        "curriculum vitae",
+        "curriculum",
+        "vitae",
         "cv",
         "profile",
         "summary",
@@ -751,25 +855,40 @@ def extract_name(
         "experience",
         "education",
         "skills",
+        "skill",
         "contact",
         "email",
         "phone",
+        "mobile",
+        "address",
+        "location",
         "developer",
         "engineer",
+        "student",
+        "projects",
+        "project",
+        "internship",
+        "intern",
+        "linkedin",
+        "github",
+        "portfolio",
     }
 
-    for line in lines[:12]:
+    for line in lines[:20]:
 
         clean = re.sub(
             r"[^A-Za-z .'-]",
             "",
-            line
+            line,
         ).strip()
 
-        words = clean.split()
+        clean = re.sub(
+            r"\s{2,}",
+            " ",
+            clean,
+        )
 
-        if not words:
-            continue
+        words = clean.split()
 
         if len(words) < 2:
             continue
@@ -785,54 +904,72 @@ def extract_name(
         ):
             continue
 
-        if all(
+        if "@" in clean:
+            continue
+
+        valid_name = all(
             re.match(
                 r"^[A-Za-z][A-Za-z.'-]*$",
-                word
+                word,
             )
             for word in words
-        ):
-            return clean
+        )
+
+        if valid_name:
+            return clean.title()
 
     # Filename fallback
     if filename:
 
-        stem = Path(
-            filename
-        ).stem
+        stem = Path(filename).stem
 
         stem = re.sub(
-            r"[_\-]+",
-            " ",
-            stem
+            r"^[a-f0-9]{6,16}_",
+            "",
+            stem,
+            flags=re.IGNORECASE,
+        )
+
+        stem = re.sub(
+            r"whatsapp image\s*",
+            "",
+            stem,
+            flags=re.IGNORECASE,
         )
 
         stem = re.sub(
             r"\b(resume|cv|final|updated|new)\b",
             "",
             stem,
-            flags=re.IGNORECASE
+            flags=re.IGNORECASE,
+        )
+
+        stem = re.sub(
+            r"[_\-]+",
+            " ",
+            stem,
         )
 
         stem = re.sub(
             r"\s+",
             " ",
-            stem
+            stem,
         ).strip()
 
-        if stem:
+        if stem and not re.fullmatch(
+            r"[\d .:_-]+",
+            stem,
+        ):
             return stem.title()
 
     return "Unknown Candidate"
 
 
 # ============================================================
-# LOCATION EXTRACTION
+# LOCATION
 # ============================================================
 
-def extract_location(
-    text: str
-) -> str:
+def extract_location(text: str) -> str:
 
     patterns = [
         r"(?:location|address|city)"
@@ -847,20 +984,17 @@ def extract_location(
         match = re.search(
             pattern,
             text,
-            re.IGNORECASE
+            re.IGNORECASE,
         )
 
         if match:
 
-            value = (
-                match.group(1)
-                .strip()
-            )
+            value = match.group(1).strip()
 
             value = re.sub(
                 r"\s{2,}",
                 " ",
-                value
+                value,
             )
 
             return value[:100]
@@ -905,14 +1039,17 @@ def extract_location(
 # EXPERIENCE EXTRACTION
 # ============================================================
 
-def extract_experience(
-    text: str
-) -> str:
+def extract_year_number(
+    text: str,
+) -> Optional[float]:
+
+    if not text:
+        return None
 
     patterns = [
         r"(\d+(?:\.\d+)?)\+?\s*"
-        r"(?:years?|yrs?)\s*"
-        r"(?:of)?\s*experience",
+        r"(?:years?|yrs?)"
+        r"(?:\s+of)?\s+experience",
 
         r"experience\s*[:\-]?\s*"
         r"(\d+(?:\.\d+)?)\+?\s*"
@@ -923,75 +1060,84 @@ def extract_experience(
 
         match = re.search(
             pattern,
-            text,
-            re.IGNORECASE
+            normalize_for_search(text),
+            re.IGNORECASE,
         )
 
         if match:
-
-            years = safe_float(
+            return safe_float(
                 match.group(1),
-                0
+                0,
             )
 
-            if years == int(years):
+    return None
 
-                return (
-                    f"{int(years)} years"
-                )
 
-            return (
-                f"{years:g} years"
-            )
+def extract_experience(
+    text: str,
+) -> str:
+
+    years = extract_year_number(text)
+
+    if years is not None:
+
+        if years == int(years):
+            return f"{int(years)} years"
+
+        return f"{years:g} years"
 
     if re.search(
         r"\bintern(ship)?\b",
         text,
-        re.IGNORECASE
+        re.IGNORECASE,
     ):
         return "Internship experience"
+
+    if re.search(
+        r"\bfresher\b|"
+        r"\bfresh graduate\b|"
+        r"\brecent graduate\b",
+        text,
+        re.IGNORECASE,
+    ):
+        return "Fresher"
 
     return "Not specified"
 
 
 # ============================================================
-# ROLE EXTRACTION
+# ROLE
 # ============================================================
 
-def extract_role(
-    text: str
-) -> str:
+def extract_role(text: str) -> str:
 
-    normalized = normalize_for_search(
-        text
-    )
+    normalized = normalize_for_search(text)
 
     for role, keywords in ROLE_KEYWORDS.items():
 
         for keyword in keywords:
 
-            if normalize_for_search(
+            keyword_normalized = normalize_for_search(
                 keyword
-            ) in normalized:
+            )
 
+            if keyword_normalized in normalized:
                 return role.title()
 
     return "Candidate"
 
 
 # ============================================================
-# EMAIL EXTRACTION
+# EMAIL
 # ============================================================
 
-def extract_email(
-    text: str
-) -> str:
+def extract_email(text: str) -> str:
 
     match = re.search(
         r"\b[A-Za-z0-9._%+-]+"
         r"@[A-Za-z0-9.-]+\."
         r"[A-Za-z]{2,}\b",
-        text
+        text,
     )
 
     if match:
@@ -1001,23 +1147,31 @@ def extract_email(
 
 
 # ============================================================
-# PHONE EXTRACTION
+# PHONE
 # ============================================================
 
-def extract_phone(
-    text: str
-) -> str:
+def extract_phone(text: str) -> str:
 
-    match = re.search(
+    patterns = [
         r"(?<!\d)"
         r"(?:\+91[\s-]?)?"
         r"[6-9]\d{9}"
         r"(?!\d)",
-        text
-    )
 
-    if match:
-        return match.group(0)
+        r"(?<!\d)"
+        r"\+91[\s-]?[6-9]\d{9}"
+        r"(?!\d)",
+    ]
+
+    for pattern in patterns:
+
+        match = re.search(
+            pattern,
+            text,
+        )
+
+        if match:
+            return match.group(0)
 
     return ""
 
@@ -1027,7 +1181,7 @@ def extract_phone(
 # ============================================================
 
 def analyze_job_description(
-    job_description: str
+    job_description: str,
 ) -> Dict[str, Any]:
 
     skills = extract_skills(
@@ -1038,10 +1192,15 @@ def analyze_job_description(
         job_description
     )
 
+    required_years = extract_year_number(
+        job_description
+    )
+
     return {
         "skills": skills,
         "role": role,
         "skillCount": len(skills),
+        "requiredYears": required_years,
     }
 
 
@@ -1051,7 +1210,7 @@ def analyze_job_description(
 
 def analyze_candidate(
     resume_text: str,
-    filename: str
+    filename: str,
 ) -> Dict[str, Any]:
 
     skills = extract_skills(
@@ -1061,27 +1220,27 @@ def analyze_candidate(
     return {
         "name": extract_name(
             resume_text,
-            filename
+            filename,
         ),
 
         "role": extract_role(
-            resume_text
+            resume_text,
         ),
 
         "experience": extract_experience(
-            resume_text
+            resume_text,
         ),
 
         "location": extract_location(
-            resume_text
+            resume_text,
         ),
 
         "email": extract_email(
-            resume_text
+            resume_text,
         ),
 
         "phone": extract_phone(
-            resume_text
+            resume_text,
         ),
 
         "skills": skills,
@@ -1095,63 +1254,104 @@ def analyze_candidate(
 def calculate_skill_match(
     jd_skills: List[str],
     candidate_skills: List[str],
-    sensitivity: str = "balanced"
+    sensitivity: str = "balanced",
 ) -> Dict[str, Any]:
 
-    jd_set = {
-        normalize_for_search(
-            skill
-        )
-        for skill in jd_skills
-    }
+    # --------------------------------------------------------
+    # Create canonical JD skill map
+    # --------------------------------------------------------
 
-    candidate_set = {
-        normalize_for_search(
-            skill
-        )
-        for skill in candidate_skills
-    }
+    jd_map: Dict[str, str] = {}
 
-    if not jd_set:
+    for skill in jd_skills:
+
+        canonical = canonical_skill(skill)
+
+        if canonical:
+            jd_map[canonical] = skill
+
+    # --------------------------------------------------------
+    # Candidate canonical skills
+    # --------------------------------------------------------
+
+    candidate_set = set()
+
+    for skill in candidate_skills:
+
+        canonical = canonical_skill(skill)
+
+        if canonical:
+            candidate_set.add(canonical)
+
+    # --------------------------------------------------------
+    # No skills in JD
+    # --------------------------------------------------------
+
+    if not jd_map:
 
         return {
-            "score": 50,
+            "score": 100.0,
             "matched": [],
             "missing": [],
         }
 
-    matched_normalized = (
-        jd_set.intersection(
-            candidate_set
-        )
-    )
+    # --------------------------------------------------------
+    # Match
+    # --------------------------------------------------------
+
+    matched_normalized = set()
+
+    for jd_skill in jd_map:
+
+        # Exact canonical match
+        if jd_skill in candidate_set:
+
+            matched_normalized.add(
+                jd_skill
+            )
+            continue
+
+        # Partial/related match
+        for candidate_skill in candidate_set:
+
+            if (
+                jd_skill in candidate_skill
+                or candidate_skill in jd_skill
+            ):
+
+                matched_normalized.add(
+                    jd_skill
+                )
+                break
+
+    # --------------------------------------------------------
+    # Missing
+    # --------------------------------------------------------
 
     missing_normalized = (
-        jd_set.difference(
-            candidate_set
-        )
+        set(jd_map.keys())
+        - matched_normalized
     )
 
-    skill_map = {
-        normalize_for_search(skill): skill
-        for skill in jd_skills
-    }
-
     matched = [
-        skill_map[item]
+        jd_map[item]
         for item in matched_normalized
-        if item in skill_map
+        if item in jd_map
     ]
 
     missing = [
-        skill_map[item]
+        jd_map[item]
         for item in missing_normalized
-        if item in skill_map
+        if item in jd_map
     ]
 
+    # --------------------------------------------------------
+    # Score
+    # --------------------------------------------------------
+
     score = (
-        len(matched)
-        / len(jd_set)
+        len(matched_normalized)
+        / len(jd_map)
     ) * 100
 
     sensitivity = str(
@@ -1166,21 +1366,17 @@ def calculate_skill_match(
 
         score = min(
             100,
-            score * 1.05 + 3
+            score * 1.05 + 3,
         )
 
+    score = clamp(
+        round(score, 1)
+    )
+
     return {
-        "score": clamp(
-            round(score, 1)
-        ),
-
-        "matched": sorted(
-            matched
-        ),
-
-        "missing": sorted(
-            missing
-        ),
+        "score": score,
+        "matched": sorted(matched),
+        "missing": sorted(missing),
     }
 
 
@@ -1190,51 +1386,39 @@ def calculate_skill_match(
 
 def calculate_experience_score(
     job_description: str,
-    resume_text: str
+    resume_text: str,
 ) -> float:
 
-    jd_lower = normalize_for_search(
+    required_years = extract_year_number(
         job_description
     )
 
-    resume_lower = normalize_for_search(
+    candidate_years = extract_year_number(
         resume_text
     )
 
-    required_match = re.search(
-        r"(\d+(?:\.\d+)?)\+?\s*"
-        r"(?:years?|yrs?)",
-        jd_lower
-    )
+    # --------------------------------------------------------
+    # IMPORTANT FIX
+    #
+    # If JD does NOT specify experience,
+    # experience should NOT affect the final score.
+    # --------------------------------------------------------
 
-    candidate_match = re.search(
-        r"(\d+(?:\.\d+)?)\+?\s*"
-        r"(?:years?|yrs?)",
-        resume_lower
-    )
+    if required_years is None:
 
-    if not required_match:
-        return 100
-
-    required_years = safe_float(
-        required_match.group(1),
-        0
-    )
-
-    candidate_years = (
-        safe_float(
-            candidate_match.group(1),
-            0
-        )
-        if candidate_match
-        else 0
-    )
+        return 100.0
 
     if required_years <= 0:
-        return 100
+
+        return 100.0
+
+    if candidate_years is None:
+
+        return 0.0
 
     if candidate_years >= required_years:
-        return 100
+
+        return 100.0
 
     ratio = (
         candidate_years
@@ -1244,7 +1428,7 @@ def calculate_experience_score(
     return clamp(
         round(
             ratio * 100,
-            1
+            1,
         )
     )
 
@@ -1255,16 +1439,47 @@ def calculate_experience_score(
 
 def calculate_final_score(
     skill_score: float,
-    experience_score: float
+    experience_score: float,
+    job_description: str,
 ) -> float:
 
-    score = (
-        skill_score * 0.85
-        + experience_score * 0.15
+    required_years = extract_year_number(
+        job_description
     )
 
+    # --------------------------------------------------------
+    # IMPORTANT FIX:
+    #
+    # If experience is NOT mentioned in JD,
+    # use skill score directly.
+    #
+    # This prevents:
+    #
+    # skill = 0
+    # experience = 100
+    #
+    # from becoming 15%.
+    # --------------------------------------------------------
+
+    if required_years is None:
+
+        final_score = skill_score
+
+    else:
+
+        # Skills = 85%
+        # Experience = 15%
+
+        final_score = (
+            skill_score * 0.85
+            + experience_score * 0.15
+        )
+
     return clamp(
-        round(score, 1)
+        round(
+            final_score,
+            1,
+        )
     )
 
 
@@ -1276,20 +1491,13 @@ def generate_explanation(
     candidate: Dict[str, Any],
     job_analysis: Dict[str, Any],
     match_result: Dict[str, Any],
-    final_score: float
+    final_score: float,
 ) -> str:
 
-    matched = match_result[
-        "matched"
-    ]
+    matched = match_result["matched"]
+    missing = match_result["missing"]
 
-    missing = match_result[
-        "missing"
-    ]
-
-    jd_skills = job_analysis[
-        "skills"
-    ]
+    jd_skills = job_analysis["skills"]
 
     if final_score >= 80:
 
@@ -1355,57 +1563,150 @@ def generate_explanation(
 def process_candidate(
     file_path: Path,
     job_analysis: Dict[str, Any],
-    options: Dict[str, Any]
+    options: Dict[str, Any],
 ) -> Dict[str, Any]:
 
     filename = file_path.name
+
+    print("=" * 60)
+    print(f"[PROCESSING] {filename}")
+
+    # --------------------------------------------------------
+    # Extract resume text
+    # --------------------------------------------------------
 
     resume_text = extract_resume_text(
         file_path
     )
 
+    print(
+        f"[TEXT LENGTH] {len(resume_text)} characters"
+    )
+
+    if not resume_text:
+
+        print(
+            f"[WARNING] No text extracted from {filename}"
+        )
+
+    # --------------------------------------------------------
+    # Analyze candidate
+    # --------------------------------------------------------
+
     candidate = analyze_candidate(
         resume_text,
-        filename
+        filename,
     )
+
+    print(
+        "[CANDIDATE NAME]",
+        candidate["name"],
+    )
+
+    print(
+        "[CANDIDATE SKILLS]",
+        candidate["skills"],
+    )
+
+    # --------------------------------------------------------
+    # Skill matching
+    # --------------------------------------------------------
 
     match_result = calculate_skill_match(
         job_analysis["skills"],
         candidate["skills"],
         options.get(
             "skillSensitivity",
-            "balanced"
-        )
+            "balanced",
+        ),
     )
 
-    experience_score = (
-        calculate_experience_score(
-            options.get(
-                "jobDescription",
-                ""
-            ),
-            resume_text
-        )
+    skill_score = match_result["score"]
+
+    # --------------------------------------------------------
+    # Experience
+    # --------------------------------------------------------
+
+    experience_score = calculate_experience_score(
+        options.get(
+            "jobDescription",
+            "",
+        ),
+        resume_text,
     )
+
+    # --------------------------------------------------------
+    # Final score
+    # --------------------------------------------------------
 
     final_score = calculate_final_score(
-        match_result["score"],
-        experience_score
+        skill_score,
+        experience_score,
+        options.get(
+            "jobDescription",
+            "",
+        ),
     )
+
+    # --------------------------------------------------------
+    # Explanation
+    # --------------------------------------------------------
 
     explanation = generate_explanation(
         candidate,
         job_analysis,
         match_result,
-        final_score
+        final_score,
     )
 
+    # --------------------------------------------------------
+    # DEBUG
+    # --------------------------------------------------------
+
+    print(
+        "[JD SKILLS]",
+        job_analysis["skills"],
+    )
+
+    print(
+        "[MATCHED SKILLS]",
+        match_result["matched"],
+    )
+
+    print(
+        "[MISSING SKILLS]",
+        match_result["missing"],
+    )
+
+    print(
+        "[SKILL SCORE]",
+        skill_score,
+    )
+
+    print(
+        "[EXPERIENCE SCORE]",
+        experience_score,
+    )
+
+    print(
+        "[FINAL SCORE]",
+        final_score,
+    )
+
+    print("=" * 60)
+
     return {
+
         "name": candidate["name"],
+
         "role": candidate["role"],
+
         "experience": candidate["experience"],
+
         "location": candidate["location"],
+
         "email": candidate["email"],
+
         "phone": candidate["phone"],
 
         "skills": candidate["skills"],
@@ -1418,13 +1719,11 @@ def process_candidate(
             match_result["missing"]
         ),
 
-        "skillScore": (
-            match_result["score"]
-        ),
+        "skillScore": skill_score,
 
-        "experienceScore": (
-            experience_score
-        ),
+        "experienceScore": experience_score,
+
+        "matchScore": final_score,
 
         "score": final_score,
 
@@ -1434,18 +1733,18 @@ def process_candidate(
 
         "resumeUrl": None,
 
-        # Internal field
+        # Internal
         "resumeText": resume_text,
     }
 
 
 # ============================================================
-# UPDATE PROCESSING STATUS
+# UPDATE SCREENING
 # ============================================================
 
 def update_screening(
     screening_id: str,
-    **values
+    **values,
 ):
 
     with lock:
@@ -1457,9 +1756,7 @@ def update_screening(
         if not screening:
             return
 
-        screening.update(
-            values
-        )
+        screening.update(values)
 
 
 # ============================================================
@@ -1467,7 +1764,7 @@ def update_screening(
 # ============================================================
 
 def run_screening(
-    screening_id: str
+    screening_id: str,
 ):
 
     try:
@@ -1481,22 +1778,16 @@ def run_screening(
             if not screening:
                 return
 
-            job_description = (
-                screening[
-                    "jobDescription"
-                ]
-            )
+            job_description = screening[
+                "jobDescription"
+            ]
 
             options = dict(
-                screening[
-                    "options"
-                ]
+                screening["options"]
             )
 
             files = list(
-                screening[
-                    "files"
-                ]
+                screening["files"]
             )
 
         # ----------------------------------------------------
@@ -1505,24 +1796,39 @@ def run_screening(
 
         update_screening(
             screening_id,
-            currentStep=(
-                "readingJobDescription"
-            ),
+
+            currentStep="readingJobDescription",
+
             progress=10,
+
             statusMessage=(
                 "Reading job description..."
-            )
+            ),
         )
 
-        job_analysis = (
-            analyze_job_description(
-                job_description
-            )
+        job_analysis = analyze_job_description(
+            job_description
         )
 
-        options[
-            "jobDescription"
-        ] = job_description
+        options["jobDescription"] = (
+            job_description
+        )
+
+        print("=" * 60)
+        print("[JOB DESCRIPTION ANALYSIS]")
+        print(
+            "[JOB ROLE]",
+            job_analysis["role"],
+        )
+        print(
+            "[JOB SKILLS]",
+            job_analysis["skills"],
+        )
+        print(
+            "[REQUIRED YEARS]",
+            job_analysis["requiredYears"],
+        )
+        print("=" * 60)
 
         # ----------------------------------------------------
         # STEP 2
@@ -1530,11 +1836,14 @@ def run_screening(
 
         update_screening(
             screening_id,
+
             currentStep="uploadingCvs",
+
             progress=25,
+
             statusMessage=(
                 "Preparing resumes..."
-            )
+            ),
         )
 
         # ----------------------------------------------------
@@ -1545,9 +1854,7 @@ def run_screening(
 
         total_files = len(files)
 
-        for index, file_info in enumerate(
-            files
-        ):
+        for index, file_info in enumerate(files):
 
             filename = file_info[
                 "filename"
@@ -1560,45 +1867,39 @@ def run_screening(
             progress = (
                 30
                 + (
-                    (
-                        index + 1
-                    )
-                    / max(
-                        total_files,
-                        1
-                    )
+                    (index + 1)
+                    / max(total_files, 1)
                 )
                 * 25
             )
 
             update_screening(
                 screening_id,
+
                 currentStep=(
                     "extractingInformation"
                 ),
+
                 progress=progress,
+
                 statusMessage=(
                     f"Reading {filename}..."
-                )
+                ),
             )
 
             result = process_candidate(
                 path,
                 job_analysis,
-                options
+                options,
             )
 
-            result[
-                "resumeUrl"
-            ] = (
+            result["resumeUrl"] = (
                 "/api/files/"
                 f"{screening_id}/"
                 f"{filename}"
             )
 
-            candidates.append(
-                result
-            )
+            candidates.append(result)
 
         # ----------------------------------------------------
         # STEP 4
@@ -1606,11 +1907,14 @@ def run_screening(
 
         update_screening(
             screening_id,
+
             currentStep="matchingSkills",
+
             progress=65,
+
             statusMessage=(
                 "Matching candidate skills..."
-            )
+            ),
         )
 
         # ----------------------------------------------------
@@ -1619,20 +1923,28 @@ def run_screening(
 
         update_screening(
             screening_id,
+
             currentStep="calculatingScore",
+
             progress=80,
+
             statusMessage=(
                 "Calculating candidate scores..."
-            )
+            ),
         )
 
         candidates.sort(
             key=lambda candidate:
-                candidate.get(
-                    "score",
-                    0
+                safe_float(
+                    candidate.get(
+                        "matchScore",
+                        candidate.get(
+                            "score",
+                            0,
+                        ),
+                    )
                 ),
-            reverse=True
+            reverse=True,
         )
 
         # ----------------------------------------------------
@@ -1641,20 +1953,18 @@ def run_screening(
 
         update_screening(
             screening_id,
-            currentStep=(
-                "generatingExplanation"
-            ),
+
+            currentStep="generatingExplanation",
+
             progress=92,
+
             statusMessage=(
                 "Generating explanations..."
-            )
+            ),
         )
 
-        # Explanations were already
-        # generated for each candidate.
-
         # ----------------------------------------------------
-        # FINISH
+        # COMPLETE
         # ----------------------------------------------------
 
         update_screening(
@@ -1673,15 +1983,20 @@ def run_screening(
             ),
 
             completedAt=(
-                datetime.utcnow()
-                .isoformat()
-            )
+                datetime.utcnow().isoformat()
+            ),
         )
 
+        print("=" * 60)
         print(
             f"[SUCCESS] Screening "
             f"{screening_id} completed."
         )
+        print(
+            f"[SUCCESS] Candidates: "
+            f"{len(candidates)}"
+        )
+        print("=" * 60)
 
     except Exception as exc:
 
@@ -1698,7 +2013,7 @@ def run_screening(
                 f"Processing failed: {exc}"
             ),
 
-            error=str(exc)
+            error=str(exc),
         )
 
 
@@ -1713,7 +2028,7 @@ def root():
         "service": "ResumeAI Backend",
         "status": "running",
         "framework": "FastAPI",
-        "version": "1.0.0",
+        "version": "3.0.0",
         "docs": "/docs",
         "health": "/api/health",
     }
@@ -1730,7 +2045,7 @@ def health():
         "status": "ok",
         "service": "ResumeAI Backend",
         "framework": "FastAPI",
-        "version": "1.0.0",
+        "version": "3.0.0",
     }
 
 
@@ -1740,12 +2055,11 @@ def health():
 
 @app.post("/api/screenings")
 def create_screening(
-    data: CreateScreeningRequest
+    data: CreateScreeningRequest,
 ):
 
     job_description = (
-        data.jobDescription
-        or ""
+        data.jobDescription or ""
     ).strip()
 
     if not job_description:
@@ -1754,30 +2068,28 @@ def create_screening(
             status_code=400,
             detail=(
                 "Job description is required."
-            )
+            ),
         )
 
     options = data.options
 
     if options is None:
-
         options = ScreeningOptions()
 
     screening_id = generate_id()
 
     screening = {
+
         "id": screening_id,
 
         "createdAt": (
-            datetime.utcnow()
-            .isoformat()
+            datetime.utcnow().isoformat()
         ),
 
-        "jobDescription": (
-            job_description
-        ),
+        "jobDescription": job_description,
 
         "options": {
+
             "minMatchScore": (
                 options.minMatchScore
             ),
@@ -1816,6 +2128,11 @@ def create_screening(
             screening_id
         ] = screening
 
+    print(
+        f"[SCREENING CREATED] "
+        f"{screening_id}"
+    )
+
     return {
         "screeningId": screening_id
     }
@@ -1831,7 +2148,7 @@ def create_screening(
 async def upload_resumes(
     screening_id: str,
     background_tasks: BackgroundTasks,
-    resumes: List[UploadFile] = File(...)
+    resumes: List[UploadFile] = File(...),
 ):
 
     with lock:
@@ -1844,9 +2161,7 @@ async def upload_resumes(
 
         raise HTTPException(
             status_code=404,
-            detail=(
-                "Screening not found."
-            )
+            detail="Screening not found.",
         )
 
     if not resumes:
@@ -1855,7 +2170,7 @@ async def upload_resumes(
             status_code=400,
             detail=(
                 "No resume files were uploaded."
-            )
+            ),
         )
 
     screening_dir = (
@@ -1864,7 +2179,7 @@ async def upload_resumes(
 
     screening_dir.mkdir(
         parents=True,
-        exist_ok=True
+        exist_ok=True,
     )
 
     saved_files = []
@@ -1874,22 +2189,25 @@ async def upload_resumes(
         if not uploaded_file.filename:
             continue
 
-        original_name = (
-            Path(
-                uploaded_file.filename
-            ).name
-        )
+        original_name = Path(
+            uploaded_file.filename
+        ).name
 
         if not allowed_file(
             original_name
         ):
+
+            print(
+                f"[SKIPPED] Unsupported file: "
+                f"{original_name}"
+            )
+
             continue
 
-        # Make filename safe
         safe_name = re.sub(
             r"[^A-Za-z0-9._-]",
             "_",
-            original_name
+            original_name,
         )
 
         unique_prefix = (
@@ -1902,8 +2220,7 @@ async def upload_resumes(
         )
 
         save_path = (
-            screening_dir
-            / stored_name
+            screening_dir / stored_name
         )
 
         try:
@@ -1912,40 +2229,37 @@ async def upload_resumes(
                 uploaded_file.read()
             )
 
-            # Per-file size check
-            max_bytes = (
-                MAX_FILE_MB
-                * 1024
-                * 1024
-            )
+            if len(content) > MAX_FILE_BYTES:
 
-            if len(content) > max_bytes:
+                print(
+                    f"[SKIPPED] File too large: "
+                    f"{original_name}"
+                )
 
                 continue
 
             with open(
                 save_path,
-                "wb"
+                "wb",
             ) as output_file:
 
-                output_file.write(
-                    content
-                )
+                output_file.write(content)
 
             saved_files.append(
                 {
-                    "filename": (
-                        stored_name
-                    ),
+                    "filename": stored_name,
 
-                    "originalFilename": (
-                        original_name
-                    ),
+                    "originalFilename":
+                        original_name,
 
-                    "path": str(
-                        save_path
-                    ),
+                    "path":
+                        str(save_path),
                 }
+            )
+
+            print(
+                f"[UPLOADED] "
+                f"{original_name}"
             )
 
         except Exception as exc:
@@ -1961,19 +2275,15 @@ async def upload_resumes(
         raise HTTPException(
             status_code=400,
             detail={
-                "message": (
-                    "No valid resume files "
-                    "were uploaded."
-                ),
+                "message":
+                    "No valid resume files were uploaded.",
 
-                "allowedExtensions": sorted(
-                    ALLOWED_EXTENSIONS
-                ),
+                "allowedExtensions":
+                    sorted(ALLOWED_EXTENSIONS),
 
-                "maxFileSizeMB": (
-                    MAX_FILE_MB
-                ),
-            }
+                "maxFileSizeMB":
+                    MAX_FILE_MB,
+            },
         )
 
     update_screening(
@@ -1985,32 +2295,28 @@ async def upload_resumes(
 
         progress=5,
 
-        currentStep=(
-            "uploadingCvs"
-        ),
+        currentStep="uploadingCvs",
 
         statusMessage=(
             "Files uploaded. "
             "Starting screening..."
-        )
+        ),
     )
 
-    # Start processing
     background_tasks.add_task(
         run_screening,
-        screening_id
+        screening_id,
     )
 
     return {
-        "message": (
-            "Resumes uploaded successfully."
-        ),
+        "message":
+            "Resumes uploaded successfully.",
 
-        "screeningId": screening_id,
+        "screeningId":
+            screening_id,
 
-        "fileCount": len(
-            saved_files
-        ),
+        "fileCount":
+            len(saved_files),
     }
 
 
@@ -2022,7 +2328,7 @@ async def upload_resumes(
     "/api/screenings/{screening_id}/status"
 )
 def screening_status(
-    screening_id: str
+    screening_id: str,
 ):
 
     with lock:
@@ -2035,54 +2341,45 @@ def screening_status(
 
         raise HTTPException(
             status_code=404,
-            detail=(
-                "Screening not found."
-            )
+            detail="Screening not found.",
         )
 
     return {
-        "id": screening["id"],
 
-        "status": screening[
-            "status"
-        ],
+        "id":
+            screening["id"],
 
-        "progress": screening[
-            "progress"
-        ],
+        "status":
+            screening["status"],
 
-        "currentStep": screening[
-            "currentStep"
-        ],
+        "progress":
+            screening["progress"],
 
-        "statusMessage": screening[
-            "statusMessage"
-        ],
+        "currentStep":
+            screening["currentStep"],
 
-        "error": screening[
-            "error"
-        ],
+        "statusMessage":
+            screening["statusMessage"],
 
-        "total": len(
-            screening["files"]
-        ),
+        "error":
+            screening["error"],
 
-        "completed": len(
-            screening["candidates"]
-        ),
+        "total":
+            len(screening["files"]),
 
-        "createdAt": screening[
-            "createdAt"
-        ],
+        "completed":
+            len(screening["candidates"]),
 
-        "completedAt": screening[
-            "completedAt"
-        ],
+        "createdAt":
+            screening["createdAt"],
+
+        "completedAt":
+            screening["completedAt"],
     }
 
 
 # ============================================================
-# GET CANDIDATE
+# GET ONE CANDIDATE
 # ============================================================
 
 @app.get(
@@ -2090,7 +2387,7 @@ def screening_status(
 )
 def get_candidate(
     screening_id: str,
-    index: int
+    index: int,
 ):
 
     with lock:
@@ -2103,15 +2400,11 @@ def get_candidate(
 
             raise HTTPException(
                 status_code=404,
-                detail=(
-                    "Screening not found."
-                )
+                detail="Screening not found.",
             )
 
         candidates = list(
-            screening[
-                "candidates"
-            ]
+            screening["candidates"]
         )
 
     if (
@@ -2121,20 +2414,35 @@ def get_candidate(
 
         raise HTTPException(
             status_code=404,
-            detail=(
-                "Candidate not found."
-            )
+            detail="Candidate not found.",
         )
 
     candidate = dict(
         candidates[index]
     )
 
-    # Don't expose full resume text
+    # Never expose raw resume text
     candidate.pop(
         "resumeText",
-        None
+        None,
     )
+
+    if "matchScore" not in candidate:
+
+        candidate["matchScore"] = (
+            safe_float(
+                candidate.get(
+                    "score",
+                    0,
+                )
+            )
+        )
+
+    if "score" not in candidate:
+
+        candidate["score"] = (
+            candidate["matchScore"]
+        )
 
     candidate["index"] = index
 
@@ -2153,7 +2461,7 @@ def get_candidate(
     "/api/screenings/{screening_id}/summary"
 )
 def get_summary(
-    screening_id: str
+    screening_id: str,
 ):
 
     with lock:
@@ -2166,42 +2474,83 @@ def get_summary(
 
             raise HTTPException(
                 status_code=404,
-                detail=(
-                    "Screening not found."
-                )
+                detail="Screening not found.",
             )
 
         candidates = list(
-            screening[
-                "candidates"
-            ]
+            screening["candidates"]
         )
 
         options = dict(
-            screening[
-                "options"
-            ]
+            screening["options"]
         )
 
+    normalized_candidates = []
+
+    for candidate in candidates:
+
+        candidate_copy = dict(
+            candidate
+        )
+
+        candidate_copy.pop(
+            "resumeText",
+            None,
+        )
+
+        score = safe_float(
+            candidate_copy.get(
+                "matchScore",
+                candidate_copy.get(
+                    "score",
+                    0,
+                ),
+            )
+        )
+
+        candidate_copy["matchScore"] = round(
+            clamp(score),
+            1,
+        )
+
+        candidate_copy["score"] = (
+            candidate_copy["matchScore"]
+        )
+
+        normalized_candidates.append(
+            candidate_copy
+        )
+
+    normalized_candidates.sort(
+        key=lambda candidate:
+            safe_float(
+                candidate.get(
+                    "matchScore",
+                    0,
+                )
+            ),
+        reverse=True,
+    )
+
     total = len(
-        candidates
+        normalized_candidates
     )
 
     min_score = safe_float(
         options.get(
             "minMatchScore",
-            60
+            60,
         ),
-        60
+        60,
     )
 
     strong_matches = [
         candidate
-        for candidate in candidates
+        for candidate in normalized_candidates
         if safe_float(
             candidate.get(
-                "score",
-                0
+                "matchScore",
+                0,
             )
         ) >= min_score
     ]
@@ -2209,11 +2558,12 @@ def get_summary(
     scores = [
         safe_float(
             candidate.get(
-                "score",
-                0
+                "matchScore",
+                0,
             )
         )
-        for candidate in candidates
+        for candidate
+        in normalized_candidates
     ]
 
     average_match = (
@@ -2222,108 +2572,88 @@ def get_summary(
         else 0
     )
 
-    sorted_candidates = sorted(
-        candidates,
-        key=lambda candidate:
-            safe_float(
-                candidate.get(
-                    "score",
-                    0
-                )
-            ),
-        reverse=True
-    )
-
     top_candidate = (
-        sorted_candidates[0]
-        if sorted_candidates
+        normalized_candidates[0]
+        if normalized_candidates
         else None
     )
 
-    result_candidates = []
-
-    for candidate in sorted_candidates:
-
-        clean_candidate = dict(
-            candidate
+    top_match = (
+        safe_float(
+            top_candidate.get(
+                "matchScore",
+                0,
+            )
         )
-
-        clean_candidate.pop(
-            "resumeText",
-            None
-        )
-
-        result_candidates.append(
-            clean_candidate
-        )
+        if top_candidate
+        else 0
+    )
 
     return {
-        "screeningId": screening_id,
 
-        "status": screening[
-            "status"
-        ],
+        "screeningId":
+            screening_id,
 
-        "total": total,
+        "status":
+            screening["status"],
 
-        "strongMatches": len(
-            strong_matches
-        ),
+        "total":
+            total,
 
-        "averageMatch": round(
-            average_match,
-            1
-        ),
+        "totalCandidates":
+            total,
 
-        "topMatch": (
+        "strongMatches":
+            len(strong_matches),
+
+        "averageMatch":
             round(
-                safe_float(
-                    top_candidate.get(
-                        "score",
-                        0
-                    )
-                ),
-                1
-            )
-            if top_candidate
-            else 0
-        ),
+                average_match,
+                1,
+            ),
 
-        "topCandidate": (
+        "topMatch":
+            round(
+                top_match,
+                1,
+            ),
+
+        "topCandidate":
             {
-                "name": (
+                "name":
                     top_candidate.get(
                         "name",
-                        "Unknown Candidate"
-                    )
-                ),
+                        "Unknown Candidate",
+                    ),
 
-                "score": (
+                "score":
                     top_candidate.get(
-                        "score",
-                        0
-                    )
-                ),
+                        "matchScore",
+                        0,
+                    ),
 
-                "role": (
+                "matchScore":
+                    top_candidate.get(
+                        "matchScore",
+                        0,
+                    ),
+
+                "role":
                     top_candidate.get(
                         "role",
-                        "Candidate"
-                    )
-                ),
+                        "Candidate",
+                    ),
             }
             if top_candidate
-            else None
-        ),
+            else None,
 
-        "candidates": (
-            result_candidates
-        ),
+        "candidates":
+            normalized_candidates,
     }
 
 
 # ============================================================
-# SERVE RESUME FILE
+# SERVE RESUME
 # ============================================================
 
 @app.get(
@@ -2331,7 +2661,7 @@ def get_summary(
 )
 def serve_file(
     screening_id: str,
-    filename: str
+    filename: str,
 ):
 
     screening_dir = (
@@ -2342,29 +2672,22 @@ def serve_file(
 
         raise HTTPException(
             status_code=404,
-            detail=(
-                "Screening files not found."
-            )
+            detail="Screening files not found.",
         )
 
-    # Security: only use the file's name,
-    # preventing ../ path traversal.
     safe_filename = Path(
         filename
     ).name
 
     requested_file = (
-        screening_dir
-        / safe_filename
+        screening_dir / safe_filename
     )
 
     if not requested_file.exists():
 
         raise HTTPException(
             status_code=404,
-            detail=(
-                "Resume file not found."
-            )
+            detail="Resume file not found.",
         )
 
     return FileResponse(
@@ -2372,7 +2695,7 @@ def serve_file(
             requested_file
         ),
         filename=safe_filename,
-        content_disposition_type="inline"
+        content_disposition_type="inline",
     )
 
 
@@ -2393,40 +2716,34 @@ def list_screenings():
 
             result.append(
                 {
-                    "id": screening[
-                        "id"
-                    ],
+                    "id":
+                        screening["id"],
 
-                    "createdAt": screening[
-                        "createdAt"
-                    ],
+                    "createdAt":
+                        screening["createdAt"],
 
-                    "status": screening[
-                        "status"
-                    ],
+                    "status":
+                        screening["status"],
 
-                    "progress": screening[
-                        "progress"
-                    ],
+                    "progress":
+                        screening["progress"],
 
-                    "total": len(
-                        screening[
-                            "files"
-                        ]
-                    ),
+                    "total":
+                        len(
+                            screening["files"]
+                        ),
 
-                    "completed": len(
-                        screening[
-                            "candidates"
-                        ]
-                    ),
+                    "completed":
+                        len(
+                            screening["candidates"]
+                        ),
                 }
             )
 
     result.sort(
         key=lambda item:
             item["createdAt"],
-        reverse=True
+        reverse=True,
     )
 
     return {
@@ -2442,7 +2759,7 @@ def list_screenings():
     "/api/screenings/{screening_id}"
 )
 def delete_screening(
-    screening_id: str
+    screening_id: str,
 ):
 
     with lock:
@@ -2451,16 +2768,13 @@ def delete_screening(
 
             raise HTTPException(
                 status_code=404,
-                detail=(
-                    "Screening not found."
-                )
+                detail="Screening not found.",
             )
 
         del screenings[
             screening_id
         ]
 
-    # Delete uploaded files
     screening_dir = (
         UPLOAD_DIR / screening_id
     )
@@ -2479,27 +2793,26 @@ def delete_screening(
 
         try:
             screening_dir.rmdir()
-
         except Exception:
             pass
 
     return {
-        "message": (
-            "Screening deleted successfully."
-        ),
+        "message":
+            "Screening deleted successfully.",
 
-        "screeningId": screening_id,
+        "screeningId":
+            screening_id,
     }
 
 
 # ============================================================
-# GLOBAL ERROR HANDLER
+# ERROR HANDLER
 # ============================================================
 
 @app.exception_handler(Exception)
 async def global_exception_handler(
     request: Request,
-    exc: Exception
+    exc: Exception,
 ):
 
     traceback.print_exc()
@@ -2507,12 +2820,12 @@ async def global_exception_handler(
     return JSONResponse(
         status_code=500,
         content={
-            "message": (
-                "Internal server error."
-            ),
+            "message":
+                "Internal server error.",
 
-            "error": str(exc),
-        }
+            "error":
+                str(exc),
+        },
     )
 
 
@@ -2523,7 +2836,7 @@ async def global_exception_handler(
 if __name__ == "__main__":
 
     import uvicorn
-    
+
     print("=" * 60)
     print("ResumeAI FastAPI Backend")
     print("=" * 60)
@@ -2538,29 +2851,29 @@ if __name__ == "__main__":
             sorted(
                 ALLOWED_EXTENSIONS
             )
-        )
+        ),
     )
 
     print(
         "Server: "
-        "http://10.30.98.18:5000"
+        "http://127.0.0.1:5000"
     )
 
     print(
-        "Swagger Docs: "
-        "http://10.30.98.18:5000",
+        "Swagger: "
+        "http://127.0.0.1:5000/docs"
     )
 
     print(
         "Health: "
-        "http://10.30.98.18:5000",
+        "http://127.0.0.1:5000/api/health"
     )
 
     print("=" * 60)
 
     uvicorn.run(
-    app,
-    host="127.0.0.1",
-    port=5000,
-    reload=False
-)
+        app,
+        host="127.0.0.1",
+        port=5000,
+        reload=False,
+    )
