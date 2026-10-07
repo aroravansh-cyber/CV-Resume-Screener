@@ -22,7 +22,7 @@
 const CONFIG = {
 
   // Flask backend from main.py
-  API_BASE: "http://10.30.98.18:5000",
+  API_BASE: "http://127.0.0.1:5000",
 
   ENDPOINTS: {
 
