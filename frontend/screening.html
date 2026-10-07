@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analyzing · ResumeAI</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body data-page="screening">
+  <div class="app">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <div class="main">
+      <header class="topbar">
+        <div class="user-chip"><span class="avatar" id="userAvatar">R</span><span id="userName">Recruiter</span></div>
+      </header>
+
+      <main class="content">
+        <div class="process-wrap">
+          <div id="processContent">
+            <div class="process-head">
+              <h1 class="page-title">Analyzing Candidates</h1>
+              <p class="page-subtitle" style="margin-bottom:0" id="statusMessage">Please keep this page open.</p>
+            </div>
+
+            <div id="processMessage" class="hidden"></div>
+
+            <section class="card">
+              <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+              <ul class="steps" id="steps">
+                <li class="step" data-step="readingJobDescription"><span class="step-dot"></span><span class="step-label">Reading Job Description</span><span class="step-state">Waiting</span></li>
+                <li class="step" data-step="uploadingCvs"><span class="step-dot"></span><span class="step-label">Uploading CVs</span><span class="step-state">Waiting</span></li>
+                <li class="step" data-step="extractingInformation"><span class="step-dot"></span><span class="step-label">Extracting Information</span><span class="step-state">Waiting</span></li>
+                <li class="step" data-step="matchingSkills"><span class="step-dot"></span><span class="step-label">Matching Skills</span><span class="step-state">Waiting</span></li>
+                <li class="step" data-step="calculatingScore"><span class="step-dot"></span><span class="step-label">Calculating Score</span><span class="step-state">Waiting</span></li>
+                <li class="step" data-step="generatingExplanation"><span class="step-dot"></span><span class="step-label">Generating Explanation</span><span class="step-state">Waiting</span></li>
+              </ul>
+            </section>
+
+            <p class="footnote hidden" id="retryLink"><a href="index.html" class="btn btn-sm">Back to Dashboard</a></p>
+          </div>
+
+          <section class="card hidden" id="noScreening">
+            <div class="empty-state">
+              <p>No screening is in progress.</p>
+              <p style="margin-top:14px"><a href="index.html" class="btn btn-primary">Start New Screening</a></p>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>
