@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, List, Dict, Any
+
 import uuid
 import threading
 import re
@@ -33,10 +34,12 @@ try:
 except ImportError:
     PdfReader = None
 
+
 try:
     from docx import Document
 except ImportError:
     Document = None
+
 
 try:
     from PIL import Image, ImageEnhance, ImageFilter
@@ -44,6 +47,7 @@ except ImportError:
     Image = None
     ImageEnhance = None
     ImageFilter = None
+
 
 try:
     import pytesseract
@@ -58,10 +62,15 @@ except ImportError:
 BASE_DIR = Path(__file__).resolve().parent
 
 UPLOAD_DIR = BASE_DIR / "uploads"
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+UPLOAD_DIR.mkdir(
+    parents=True,
+    exist_ok=True,
+)
 
 MAX_FILE_MB = 10
-MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024
+MAX_FILE_BYTES = (
+    MAX_FILE_MB * 1024 * 1024
+)
 
 ALLOWED_EXTENSIONS = {
     "pdf",
@@ -80,7 +89,7 @@ ALLOWED_EXTENSIONS = {
 app = FastAPI(
     title="ResumeAI API",
     description="AI-powered Resume Screening API",
-    version="3.0.0",
+    version="4.0.0",
 )
 
 
@@ -111,6 +120,7 @@ lock = threading.Lock()
 # ============================================================
 
 SKILL_DATABASE = {
+
     # Programming
     "python",
     "java",
@@ -235,7 +245,6 @@ SKILL_DATABASE = {
     "communication",
     "leadership",
     "problem solving",
-    "problem-solving",
     "teamwork",
 }
 
@@ -245,8 +254,10 @@ SKILL_DATABASE = {
 # ============================================================
 
 SKILL_ALIASES = {
+
     "python3": "python",
     "python 3": "python",
+    "py": "python",
 
     "js": "javascript",
     "javascript es6": "javascript",
@@ -257,6 +268,7 @@ SKILL_ALIASES = {
     "react js": "react",
 
     "angularjs": "angular",
+    "angular js": "angular",
 
     "vuejs": "vue",
     "vue js": "vue",
@@ -278,48 +290,38 @@ SKILL_ALIASES = {
     "postgres db": "postgresql",
     "postgres database": "postgresql",
     "postgre sql": "postgresql",
-    "postgreSQL": "postgresql",
 
     "mongo": "mongodb",
     "mongo db": "mongodb",
 
     "google cloud platform": "google cloud",
-
     "gcp": "google cloud",
 
     "aws cloud": "aws",
 
     "ml": "machine learning",
-
     "ai/ml": "machine learning",
-
-    "artificial intelligence": "artificial intelligence",
 
     "sklearn": "scikit-learn",
     "scikit learn": "scikit-learn",
-
-    "tensorflow 2": "tensorflow",
-
-    "pytorch": "pytorch",
 
     "cv": "computer vision",
 
     "nlp": "natural language processing",
 
     "powerbi": "power bi",
-
     "power-bi": "power bi",
 
-    "problem solving": "problem solving",
     "problem-solving": "problem solving",
 }
 
 
 # ============================================================
-# ROLE KEYWORDS
+# ROLE DATABASE
 # ============================================================
 
 ROLE_KEYWORDS = {
+
     "software engineer": [
         "software engineer",
         "software developer",
@@ -385,14 +387,21 @@ ROLE_KEYWORDS = {
 # ============================================================
 
 class ScreeningOptions(BaseModel):
+
     minMatchScore: float = 60
+
     skillSensitivity: str = "balanced"
+
     aiExplanation: bool = True
 
 
 class CreateScreeningRequest(BaseModel):
+
     jobDescription: str
-    options: Optional[ScreeningOptions] = None
+
+    options: Optional[
+        ScreeningOptions
+    ] = None
 
 
 # ============================================================
@@ -400,24 +409,49 @@ class CreateScreeningRequest(BaseModel):
 # ============================================================
 
 def generate_id() -> str:
+
     return uuid.uuid4().hex[:12]
 
 
-def get_extension(filename: str) -> str:
-    if not filename or "." not in filename:
+def get_extension(
+    filename: str,
+) -> str:
+
+    if (
+        not filename
+        or "."
+        not in filename
+    ):
         return ""
 
-    return filename.rsplit(".", 1)[1].lower()
+    return filename.rsplit(
+        ".",
+        1
+    )[1].lower()
 
 
-def allowed_file(filename: str) -> bool:
-    return get_extension(filename) in ALLOWED_EXTENSIONS
+def allowed_file(
+    filename: str,
+) -> bool:
+
+    return (
+        get_extension(filename)
+        in ALLOWED_EXTENSIONS
+    )
 
 
-def safe_float(value, default=0.0) -> float:
+def safe_float(
+    value,
+    default=0.0,
+) -> float:
+
     try:
         return float(value)
-    except (TypeError, ValueError):
+
+    except (
+        TypeError,
+        ValueError,
+    ):
         return default
 
 
@@ -429,16 +463,24 @@ def clamp(
 
     return max(
         minimum,
-        min(maximum, value),
+        min(
+            maximum,
+            safe_float(value),
+        ),
     )
 
 
-def clean_text(text: str) -> str:
+def clean_text(
+    text: str,
+) -> str:
 
     if not text:
         return ""
 
-    text = text.replace("\x00", " ")
+    text = text.replace(
+        "\x00",
+        " ",
+    )
 
     text = re.sub(
         r"\r\n?",
@@ -461,16 +503,28 @@ def clean_text(text: str) -> str:
     return text.strip()
 
 
-def normalize_for_search(text: str) -> str:
+def normalize_text(
+    text: str,
+) -> str:
 
-    if not text:
-        return ""
+    text = str(
+        text or ""
+    ).lower()
 
-    text = str(text).lower()
+    text = text.replace(
+        "–",
+        "-",
+    )
 
-    text = text.replace("–", "-")
-    text = text.replace("—", "-")
-    text = text.replace("•", " ")
+    text = text.replace(
+        "—",
+        "-",
+    )
+
+    text = text.replace(
+        "•",
+        " ",
+    )
 
     text = re.sub(
         r"\s+",
@@ -481,51 +535,89 @@ def normalize_for_search(text: str) -> str:
     return text.strip()
 
 
-def canonical_skill(skill: str) -> str:
+def canonical_skill(
+    skill: str,
+) -> str:
 
-    skill = normalize_for_search(skill)
+    skill = normalize_text(
+        skill
+    )
 
     if not skill:
         return ""
 
     if skill in SKILL_ALIASES:
-        skill = SKILL_ALIASES[skill]
 
-    return normalize_for_search(skill)
+        skill = SKILL_ALIASES[
+            skill
+        ]
+
+    return normalize_text(
+        skill
+    )
 
 
 # ============================================================
 # PDF EXTRACTION
 # ============================================================
 
-def extract_pdf_text(file_path: Path) -> str:
+def extract_pdf_text(
+    file_path: Path,
+) -> str:
 
     if PdfReader is None:
-        print("[WARNING] PyPDF2 is not installed.")
+
+        print(
+            "[ERROR] PyPDF2 is not installed."
+        )
+
         return ""
 
     try:
 
-        reader = PdfReader(str(file_path))
+        reader = PdfReader(
+            str(file_path)
+        )
 
         pages = []
 
         for page in reader.pages:
 
             try:
-                page_text = page.extract_text() or ""
-                pages.append(page_text)
+
+                text = (
+                    page.extract_text()
+                    or ""
+                )
+
+                if text.strip():
+
+                    pages.append(text)
 
             except Exception as exc:
-                print(f"[PDF PAGE ERROR] {exc}")
 
-        return clean_text(
+                print(
+                    "[PDF PAGE ERROR]",
+                    exc,
+                )
+
+        result = clean_text(
             "\n".join(pages)
         )
 
+        print(
+            f"[PDF TEXT] {len(result)} characters"
+        )
+
+        return result
+
     except Exception as exc:
 
-        print(f"[PDF ERROR] {exc}")
+        print(
+            "[PDF ERROR]",
+            exc,
+        )
+
         return ""
 
 
@@ -533,22 +625,35 @@ def extract_pdf_text(file_path: Path) -> str:
 # DOCX EXTRACTION
 # ============================================================
 
-def extract_docx_text(file_path: Path) -> str:
+def extract_docx_text(
+    file_path: Path,
+) -> str:
 
     if Document is None:
-        print("[WARNING] python-docx is not installed.")
+
+        print(
+            "[ERROR] python-docx is not installed."
+        )
+
         return ""
 
     try:
 
-        document = Document(str(file_path))
+        document = Document(
+            str(file_path)
+        )
 
         parts = []
 
-        for paragraph in document.paragraphs:
+        for paragraph in (
+            document.paragraphs
+        ):
 
             if paragraph.text:
-                parts.append(paragraph.text)
+
+                parts.append(
+                    paragraph.text
+                )
 
         for table in document.tables:
 
@@ -559,9 +664,13 @@ def extract_docx_text(file_path: Path) -> str:
                 for cell in row.cells:
 
                     if cell.text:
-                        values.append(cell.text)
+
+                        values.append(
+                            cell.text
+                        )
 
                 if values:
+
                     parts.append(
                         " | ".join(values)
                     )
@@ -572,7 +681,11 @@ def extract_docx_text(file_path: Path) -> str:
 
     except Exception as exc:
 
-        print(f"[DOCX ERROR] {exc}")
+        print(
+            "[DOCX ERROR]",
+            exc,
+        )
+
         return ""
 
 
@@ -580,7 +693,9 @@ def extract_docx_text(file_path: Path) -> str:
 # OLD DOC EXTRACTION
 # ============================================================
 
-def extract_doc_text(file_path: Path) -> str:
+def extract_doc_text(
+    file_path: Path,
+) -> str:
 
     try:
 
@@ -594,18 +709,25 @@ def extract_doc_text(file_path: Path) -> str:
             timeout=20,
         )
 
-        if result.returncode == 0:
+        if (
+            result.returncode == 0
+            and result.stdout
+        ):
 
             return clean_text(
                 result.stdout
             )
 
-    except Exception:
-        pass
+    except Exception as exc:
+
+        print(
+            "[DOC ERROR]",
+            exc,
+        )
 
     print(
-        "[WARNING] Could not extract .doc file. "
-        "Install antiword or convert .doc to .docx."
+        "[WARNING] Could not extract .doc. "
+        "Install antiword or convert to .docx."
     )
 
     return ""
@@ -615,22 +737,37 @@ def extract_doc_text(file_path: Path) -> str:
 # IMAGE OCR
 # ============================================================
 
-def extract_image_text(file_path: Path) -> str:
+def extract_image_text(
+    file_path: Path,
+) -> str:
 
     if Image is None:
-        print("[WARNING] Pillow is not installed.")
+
+        print(
+            "[ERROR] Pillow is not installed."
+        )
+
         return ""
 
     if pytesseract is None:
-        print("[WARNING] pytesseract is not installed.")
+
+        print(
+            "[ERROR] pytesseract is not installed."
+        )
+
         return ""
 
     try:
 
-        image = Image.open(file_path)
+        image = Image.open(
+            file_path
+        )
 
         if image.mode != "RGB":
-            image = image.convert("RGB")
+
+            image = image.convert(
+                "RGB"
+            )
 
         try:
 
@@ -663,11 +800,17 @@ def extract_image_text(file_path: Path) -> str:
             config="--psm 6",
         )
 
-        return clean_text(text)
+        return clean_text(
+            text
+        )
 
     except Exception as exc:
 
-        print(f"[OCR ERROR] {exc}")
+        print(
+            "[OCR ERROR]",
+            exc,
+        )
+
         return ""
 
 
@@ -684,20 +827,32 @@ def extract_resume_text(
     )
 
     if extension == "pdf":
-        return extract_pdf_text(file_path)
+
+        return extract_pdf_text(
+            file_path
+        )
 
     if extension == "docx":
-        return extract_docx_text(file_path)
+
+        return extract_docx_text(
+            file_path
+        )
 
     if extension == "doc":
-        return extract_doc_text(file_path)
+
+        return extract_doc_text(
+            file_path
+        )
 
     if extension in {
         "jpg",
         "jpeg",
         "png",
     }:
-        return extract_image_text(file_path)
+
+        return extract_image_text(
+            file_path
+        )
 
     return ""
 
@@ -706,24 +861,33 @@ def extract_resume_text(
 # SKILL EXTRACTION
 # ============================================================
 
-def extract_skills(text: str) -> List[str]:
+def extract_skills(
+    text: str,
+) -> List[str]:
 
-    normalized = normalize_for_search(text)
+    normalized = normalize_text(
+        text
+    )
 
     if not normalized:
+
         return []
 
-    found: Dict[str, str] = {}
+    found = {}
 
-    # Check canonical database skills
+    # --------------------------------------------------------
+    # Database skills
+    # --------------------------------------------------------
+
     for skill in SKILL_DATABASE:
 
-        canonical = canonical_skill(skill)
+        canonical = canonical_skill(
+            skill
+        )
 
         if not canonical:
             continue
 
-        # Convert special characters to safe regex
         pattern = (
             r"(?<![a-z0-9])"
             + re.escape(canonical)
@@ -738,22 +902,32 @@ def extract_skills(text: str) -> List[str]:
                 re.IGNORECASE,
             ):
 
-                found[canonical] = skill
+                found[
+                    canonical
+                ] = skill
 
         except re.error:
 
             if canonical in normalized:
-                found[canonical] = skill
 
-    # Check aliases explicitly
-    for alias, canonical in SKILL_ALIASES.items():
+                found[
+                    canonical
+                ] = skill
 
-        alias_normalized = normalize_for_search(
-            alias
+    # --------------------------------------------------------
+    # Aliases
+    # --------------------------------------------------------
+
+    for alias, canonical in (
+        SKILL_ALIASES.items()
+    ):
+
+        alias_normalized = (
+            normalize_text(alias)
         )
 
-        canonical_normalized = canonical_skill(
-            canonical
+        canonical_normalized = (
+            canonical_skill(canonical)
         )
 
         if not alias_normalized:
@@ -761,7 +935,9 @@ def extract_skills(text: str) -> List[str]:
 
         pattern = (
             r"(?<![a-z0-9])"
-            + re.escape(alias_normalized)
+            + re.escape(
+                alias_normalized
+            )
             + r"(?![a-z0-9])"
         )
 
@@ -773,16 +949,20 @@ def extract_skills(text: str) -> List[str]:
                 re.IGNORECASE,
             ):
 
-                # Find canonical display name
-                display = canonical_normalized
+                display = canonical
 
-                for database_skill in SKILL_DATABASE:
+                for db_skill in (
+                    SKILL_DATABASE
+                ):
 
-                    if canonical_skill(
-                        database_skill
-                    ) == canonical_normalized:
+                    if (
+                        canonical_skill(
+                            db_skill
+                        )
+                        == canonical_normalized
+                    ):
 
-                        display = database_skill
+                        display = db_skill
                         break
 
                 found[
@@ -794,12 +974,12 @@ def extract_skills(text: str) -> List[str]:
 
     return sorted(
         set(found.values()),
-        key=lambda value: value.lower(),
+        key=lambda x: x.lower(),
     )
 
 
 # ============================================================
-# NAME EXTRACTION
+# NAME
 # ============================================================
 
 def extract_name(
@@ -813,17 +993,18 @@ def extract_name(
         if line.strip()
     ]
 
-    explicit_patterns = [
+    # Explicit name
+    patterns = [
         r"^(?:name|candidate name|full name)"
         r"\s*[:\-]\s*(.+)$",
 
-        r"^(?:candidate)"
+        r"^candidate"
         r"\s*[:\-]\s*(.+)$",
     ]
 
     for line in lines[:30]:
 
-        for pattern in explicit_patterns:
+        for pattern in patterns:
 
             match = re.match(
                 pattern,
@@ -833,18 +1014,22 @@ def extract_name(
 
             if match:
 
-                name = match.group(1).strip()
-
-                name = re.sub(
-                    r"\s{2,}",
-                    " ",
-                    name,
+                name = (
+                    match.group(1)
+                    .strip()
                 )
 
-                if 2 <= len(name.split()) <= 6:
+                if (
+                    2
+                    <= len(
+                        name.split()
+                    )
+                    <= 6
+                ):
+
                     return name
 
-    blocked_words = {
+    blocked = {
         "resume",
         "curriculum",
         "vitae",
@@ -882,12 +1067,6 @@ def extract_name(
             line,
         ).strip()
 
-        clean = re.sub(
-            r"\s{2,}",
-            " ",
-            clean,
-        )
-
         words = clean.split()
 
         if len(words) < 2:
@@ -900,14 +1079,11 @@ def extract_name(
 
         if any(
             word in lower
-            for word in blocked_words
+            for word in blocked
         ):
             continue
 
-        if "@" in clean:
-            continue
-
-        valid_name = all(
+        valid = all(
             re.match(
                 r"^[A-Za-z][A-Za-z.'-]*$",
                 word,
@@ -915,13 +1091,16 @@ def extract_name(
             for word in words
         )
 
-        if valid_name:
+        if valid:
+
             return clean.title()
 
     # Filename fallback
     if filename:
 
-        stem = Path(filename).stem
+        stem = Path(
+            filename
+        ).stem
 
         stem = re.sub(
             r"^[a-f0-9]{6,16}_",
@@ -956,10 +1135,14 @@ def extract_name(
             stem,
         ).strip()
 
-        if stem and not re.fullmatch(
-            r"[\d .:_-]+",
-            stem,
+        if (
+            stem
+            and not re.fullmatch(
+                r"[\d .:_-]+",
+                stem,
+            )
         ):
+
             return stem.title()
 
     return "Unknown Candidate"
@@ -969,9 +1152,12 @@ def extract_name(
 # LOCATION
 # ============================================================
 
-def extract_location(text: str) -> str:
+def extract_location(
+    text: str,
+) -> str:
 
     patterns = [
+
         r"(?:location|address|city)"
         r"\s*[:\-]\s*([^\n]+)",
 
@@ -989,15 +1175,14 @@ def extract_location(text: str) -> str:
 
         if match:
 
-            value = match.group(1).strip()
-
-            value = re.sub(
-                r"\s{2,}",
-                " ",
-                value,
+            return (
+                re.sub(
+                    r"\s{2,}",
+                    " ",
+                    match.group(1),
+                )
+                .strip()[:100]
             )
-
-            return value[:100]
 
     cities = [
         "Dehradun",
@@ -1030,13 +1215,14 @@ def extract_location(text: str) -> str:
     for city in cities:
 
         if city.lower() in lower:
+
             return city
 
     return "Not specified"
 
 
 # ============================================================
-# EXPERIENCE EXTRACTION
+# EXPERIENCE
 # ============================================================
 
 def extract_year_number(
@@ -1044,9 +1230,15 @@ def extract_year_number(
 ) -> Optional[float]:
 
     if not text:
+
         return None
 
+    normalized = normalize_text(
+        text
+    )
+
     patterns = [
+
         r"(\d+(?:\.\d+)?)\+?\s*"
         r"(?:years?|yrs?)"
         r"(?:\s+of)?\s+experience",
@@ -1054,20 +1246,24 @@ def extract_year_number(
         r"experience\s*[:\-]?\s*"
         r"(\d+(?:\.\d+)?)\+?\s*"
         r"(?:years?|yrs?)",
+
+        r"(\d+(?:\.\d+)?)\+?\s*"
+        r"(?:years?|yrs?)"
+        r"\s+(?:in|of)\s+",
     ]
 
     for pattern in patterns:
 
         match = re.search(
             pattern,
-            normalize_for_search(text),
+            normalized,
             re.IGNORECASE,
         )
 
         if match:
+
             return safe_float(
-                match.group(1),
-                0,
+                match.group(1)
             )
 
     return None
@@ -1077,20 +1273,28 @@ def extract_experience(
     text: str,
 ) -> str:
 
-    years = extract_year_number(text)
+    years = extract_year_number(
+        text
+    )
 
     if years is not None:
 
         if years == int(years):
-            return f"{int(years)} years"
 
-        return f"{years:g} years"
+            return (
+                f"{int(years)} years"
+            )
+
+        return (
+            f"{years:g} years"
+        )
 
     if re.search(
         r"\bintern(ship)?\b",
         text,
         re.IGNORECASE,
     ):
+
         return "Internship experience"
 
     if re.search(
@@ -1100,6 +1304,7 @@ def extract_experience(
         text,
         re.IGNORECASE,
     ):
+
         return "Fresher"
 
     return "Not specified"
@@ -1109,19 +1314,24 @@ def extract_experience(
 # ROLE
 # ============================================================
 
-def extract_role(text: str) -> str:
+def extract_role(
+    text: str,
+) -> str:
 
-    normalized = normalize_for_search(text)
+    normalized = normalize_text(
+        text
+    )
 
-    for role, keywords in ROLE_KEYWORDS.items():
+    for role, keywords in (
+        ROLE_KEYWORDS.items()
+    ):
 
         for keyword in keywords:
 
-            keyword_normalized = normalize_for_search(
+            if normalize_text(
                 keyword
-            )
+            ) in normalized:
 
-            if keyword_normalized in normalized:
                 return role.title()
 
     return "Candidate"
@@ -1131,7 +1341,9 @@ def extract_role(text: str) -> str:
 # EMAIL
 # ============================================================
 
-def extract_email(text: str) -> str:
+def extract_email(
+    text: str,
+) -> str:
 
     match = re.search(
         r"\b[A-Za-z0-9._%+-]+"
@@ -1141,6 +1353,7 @@ def extract_email(text: str) -> str:
     )
 
     if match:
+
         return match.group(0)
 
     return ""
@@ -1150,9 +1363,12 @@ def extract_email(text: str) -> str:
 # PHONE
 # ============================================================
 
-def extract_phone(text: str) -> str:
+def extract_phone(
+    text: str,
+) -> str:
 
     patterns = [
+
         r"(?<!\d)"
         r"(?:\+91[\s-]?)?"
         r"[6-9]\d{9}"
@@ -1171,6 +1387,7 @@ def extract_phone(text: str) -> str:
         )
 
         if match:
+
             return match.group(0)
 
     return ""
@@ -1188,19 +1405,20 @@ def analyze_job_description(
         job_description
     )
 
-    role = extract_role(
-        job_description
-    )
-
-    required_years = extract_year_number(
-        job_description
-    )
-
     return {
         "skills": skills,
-        "role": role,
-        "skillCount": len(skills),
-        "requiredYears": required_years,
+
+        "role": extract_role(
+            job_description
+        ),
+
+        "requiredYears":
+            extract_year_number(
+                job_description
+            ),
+
+        "skillCount":
+            len(skills),
     }
 
 
@@ -1213,11 +1431,8 @@ def analyze_candidate(
     filename: str,
 ) -> Dict[str, Any]:
 
-    skills = extract_skills(
-        resume_text
-    )
-
     return {
+
         "name": extract_name(
             resume_text,
             filename,
@@ -1243,7 +1458,9 @@ def analyze_candidate(
             resume_text,
         ),
 
-        "skills": skills,
+        "skills": extract_skills(
+            resume_text,
+        ),
     }
 
 
@@ -1257,106 +1474,114 @@ def calculate_skill_match(
     sensitivity: str = "balanced",
 ) -> Dict[str, Any]:
 
-    # --------------------------------------------------------
-    # Create canonical JD skill map
-    # --------------------------------------------------------
+    jd_map = {}
 
-    jd_map: Dict[str, str] = {}
+    for skill in jd_skills or []:
 
-    for skill in jd_skills:
-
-        canonical = canonical_skill(skill)
+        canonical = canonical_skill(
+            skill
+        )
 
         if canonical:
-            jd_map[canonical] = skill
 
-    # --------------------------------------------------------
-    # Candidate canonical skills
-    # --------------------------------------------------------
+            jd_map[
+                canonical
+            ] = skill
+
 
     candidate_set = set()
 
-    for skill in candidate_skills:
+    for skill in candidate_skills or []:
 
-        canonical = canonical_skill(skill)
+        canonical = canonical_skill(
+            skill
+        )
 
         if canonical:
-            candidate_set.add(canonical)
+
+            candidate_set.add(
+                canonical
+            )
+
 
     # --------------------------------------------------------
-    # No skills in JD
+    # No detected JD skills
     # --------------------------------------------------------
 
     if not jd_map:
 
         return {
-            "score": 100.0,
+            "score": 50.0,
             "matched": [],
             "missing": [],
         }
 
-    # --------------------------------------------------------
-    # Match
-    # --------------------------------------------------------
 
-    matched_normalized = set()
+    matched = set()
+
+
+    # --------------------------------------------------------
+    # Exact / related matching
+    # --------------------------------------------------------
 
     for jd_skill in jd_map:
 
-        # Exact canonical match
         if jd_skill in candidate_set:
 
-            matched_normalized.add(
+            matched.add(
                 jd_skill
             )
+
             continue
 
-        # Partial/related match
-        for candidate_skill in candidate_set:
+
+        for candidate_skill in (
+            candidate_set
+        ):
 
             if (
+                jd_skill == candidate_skill
+                or
                 jd_skill in candidate_skill
-                or candidate_skill in jd_skill
+                or
+                candidate_skill in jd_skill
             ):
 
-                matched_normalized.add(
+                matched.add(
                     jd_skill
                 )
+
                 break
 
-    # --------------------------------------------------------
-    # Missing
-    # --------------------------------------------------------
 
-    missing_normalized = (
+    missing = (
         set(jd_map.keys())
-        - matched_normalized
+        - matched
     )
 
-    matched = [
-        jd_map[item]
-        for item in matched_normalized
-        if item in jd_map
+
+    matched_display = [
+        jd_map[x]
+        for x in matched
     ]
 
-    missing = [
-        jd_map[item]
-        for item in missing_normalized
-        if item in jd_map
+    missing_display = [
+        jd_map[x]
+        for x in missing
     ]
 
-    # --------------------------------------------------------
-    # Score
-    # --------------------------------------------------------
 
     score = (
-        len(matched_normalized)
-        / len(jd_map)
+        len(matched)
+        /
+        len(jd_map)
     ) * 100
+
 
     sensitivity = str(
         sensitivity or "balanced"
     ).lower()
+
 
     if sensitivity == "strict":
 
@@ -1369,15 +1594,211 @@ def calculate_skill_match(
             score * 1.05 + 3,
         )
 
-    score = clamp(
-        round(score, 1)
-    )
 
     return {
-        "score": score,
-        "matched": sorted(matched),
-        "missing": sorted(missing),
+
+        "score": round(
+            clamp(score),
+            1,
+        ),
+
+        "matched": sorted(
+            matched_display,
+            key=lambda x: x.lower(),
+        ),
+
+        "missing": sorted(
+            missing_display,
+            key=lambda x: x.lower(),
+        ),
     }
+
+
+# ============================================================
+# KEYWORD MATCH
+# ============================================================
+
+STOP_WORDS = {
+    "the",
+    "and",
+    "for",
+    "with",
+    "that",
+    "this",
+    "from",
+    "into",
+    "your",
+    "you",
+    "are",
+    "will",
+    "have",
+    "has",
+    "our",
+    "their",
+    "they",
+    "them",
+    "job",
+    "role",
+    "work",
+    "working",
+    "candidate",
+    "required",
+    "requirements",
+    "preferred",
+    "using",
+    "looking",
+    "years",
+    "year",
+    "experience",
+    "responsibilities",
+    "skills",
+    "should",
+    "must",
+    "ability",
+    "knowledge",
+    "strong",
+    "good",
+    "team",
+    "development",
+    "developer",
+}
+
+
+def calculate_keyword_match(
+    job_description: str,
+    resume_text: str,
+) -> float:
+
+    jd = normalize_text(
+        job_description
+    )
+
+    resume = normalize_text(
+        resume_text
+    )
+
+    if not jd or not resume:
+
+        return 0.0
+
+
+    jd_words = set(
+        word
+        for word in re.findall(
+            r"[a-zA-Z0-9+#.-]+",
+            jd,
+        )
+        if len(word) >= 4
+        and word not in STOP_WORDS
+    )
+
+
+    resume_words = set(
+        re.findall(
+            r"[a-zA-Z0-9+#.-]+",
+            resume,
+        )
+    )
+
+
+    if not jd_words:
+
+        return 50.0
+
+
+    matched = (
+        jd_words
+        &
+        resume_words
+    )
+
+
+    return round(
+        clamp(
+            (
+                len(matched)
+                /
+                len(jd_words)
+            )
+            * 100
+        ),
+        1,
+    )
+
+
+# ============================================================
+# PHRASE MATCH
+# ============================================================
+
+def calculate_phrase_match(
+    job_description: str,
+    resume_text: str,
+) -> float:
+
+    jd = normalize_text(
+        job_description
+    )
+
+    resume = normalize_text(
+        resume_text
+    )
+
+    if not jd or not resume:
+
+        return 0.0
+
+
+    phrases = [
+        "machine learning",
+        "deep learning",
+        "artificial intelligence",
+        "data science",
+        "data analysis",
+        "web development",
+        "mobile development",
+        "backend development",
+        "frontend development",
+        "full stack",
+        "software development",
+        "rest api",
+        "cloud computing",
+        "database management",
+        "problem solving",
+        "object oriented programming",
+        "computer vision",
+        "natural language processing",
+        "generative ai",
+    ]
+
+
+    jd_phrases = [
+        phrase
+        for phrase in phrases
+        if phrase in jd
+    ]
+
+
+    if not jd_phrases:
+
+        return 50.0
+
+
+    matched = [
+        phrase
+        for phrase in jd_phrases
+        if phrase in resume
+    ]
+
+
+    return round(
+        (
+            len(matched)
+            /
+            len(jd_phrases)
+        )
+        * 100,
+        1,
+    )
 
 
 # ============================================================
@@ -1389,47 +1810,45 @@ def calculate_experience_score(
     resume_text: str,
 ) -> float:
 
-    required_years = extract_year_number(
+    required = extract_year_number(
         job_description
     )
 
-    candidate_years = extract_year_number(
+    candidate = extract_year_number(
         resume_text
     )
 
-    # --------------------------------------------------------
-    # IMPORTANT FIX
-    #
-    # If JD does NOT specify experience,
-    # experience should NOT affect the final score.
-    # --------------------------------------------------------
 
-    if required_years is None:
+    if required is None:
 
         return 100.0
 
-    if required_years <= 0:
+
+    if required <= 0:
 
         return 100.0
 
-    if candidate_years is None:
 
-        return 0.0
+    if candidate is None:
 
-    if candidate_years >= required_years:
+        return 50.0
+
+
+    if candidate >= required:
 
         return 100.0
 
-    ratio = (
-        candidate_years
-        / required_years
-    )
 
-    return clamp(
-        round(
-            ratio * 100,
-            1,
-        )
+    return round(
+        clamp(
+            (
+                candidate
+                /
+                required
+            )
+            * 100
+        ),
+        1,
     )
 
 
@@ -1439,48 +1858,170 @@ def calculate_experience_score(
 
 def calculate_final_score(
     skill_score: float,
+    keyword_score: float,
+    phrase_score: float,
     experience_score: float,
     job_description: str,
 ) -> float:
 
-    required_years = extract_year_number(
+    skill_score = clamp(
+        skill_score
+    )
+
+    keyword_score = clamp(
+        keyword_score
+    )
+
+    phrase_score = clamp(
+        phrase_score
+    )
+
+    experience_score = clamp(
+        experience_score
+    )
+
+
+    required = extract_year_number(
         job_description
     )
 
+
     # --------------------------------------------------------
-    # IMPORTANT FIX:
+    # NO EXPERIENCE REQUIREMENT
     #
-    # If experience is NOT mentioned in JD,
-    # use skill score directly.
-    #
-    # This prevents:
-    #
-    # skill = 0
-    # experience = 100
-    #
-    # from becoming 15%.
+    # Skills       = 60%
+    # Keywords     = 25%
+    # Phrases      = 15%
     # --------------------------------------------------------
 
-    if required_years is None:
+    if required is None:
 
-        final_score = skill_score
+        final_score = (
+            skill_score * 0.60
+            +
+            keyword_score * 0.25
+            +
+            phrase_score * 0.15
+        )
+
+
+    # --------------------------------------------------------
+    # EXPERIENCE REQUIREMENT
+    #
+    # Skills       = 55%
+    # Keywords     = 20%
+    # Phrases      = 10%
+    # Experience   = 15%
+    # --------------------------------------------------------
 
     else:
 
-        # Skills = 85%
-        # Experience = 15%
-
         final_score = (
-            skill_score * 0.85
-            + experience_score * 0.15
+            skill_score * 0.55
+            +
+            keyword_score * 0.20
+            +
+            phrase_score * 0.10
+            +
+            experience_score * 0.15
         )
 
-    return clamp(
-        round(
-            final_score,
-            1,
+
+    return round(
+        clamp(final_score),
+        1,
+    )
+
+
+# ============================================================
+# MATCH ANALYSIS
+# ============================================================
+
+def calculate_candidate_match(
+    job_description: str,
+    resume_text: str,
+    jd_skills: List[str],
+    candidate_skills: List[str],
+    sensitivity: str = "balanced",
+) -> Dict[str, Any]:
+
+    skill_result = calculate_skill_match(
+        jd_skills,
+        candidate_skills,
+        sensitivity,
+    )
+
+
+    skill_score = safe_float(
+        skill_result.get(
+            "score",
+            0,
         )
     )
+
+
+    keyword_score = (
+        calculate_keyword_match(
+            job_description,
+            resume_text,
+        )
+    )
+
+
+    phrase_score = (
+        calculate_phrase_match(
+            job_description,
+            resume_text,
+        )
+    )
+
+
+    experience_score = (
+        calculate_experience_score(
+            job_description,
+            resume_text,
+        )
+    )
+
+
+    final_score = (
+        calculate_final_score(
+            skill_score,
+            keyword_score,
+            phrase_score,
+            experience_score,
+            job_description,
+        )
+    )
+
+
+    return {
+
+        "score": final_score,
+
+        "matchScore": final_score,
+
+        "match_score": final_score,
+
+        "skillScore": skill_score,
+
+        "keywordScore": keyword_score,
+
+        "phraseScore": phrase_score,
+
+        "experienceScore":
+            experience_score,
+
+        "matchedSkills":
+            skill_result[
+                "matched"
+            ],
+
+        "missingSkills":
+            skill_result[
+                "missing"
+            ],
+    }
 
 
 # ============================================================
@@ -1489,25 +2030,38 @@ def calculate_final_score(
 
 def generate_explanation(
     candidate: Dict[str, Any],
-    job_analysis: Dict[str, Any],
     match_result: Dict[str, Any],
-    final_score: float,
 ) -> str:
 
-    matched = match_result["matched"]
-    missing = match_result["missing"]
+    score = safe_float(
+        match_result.get(
+            "score",
+            0,
+        )
+    )
 
-    jd_skills = job_analysis["skills"]
 
-    if final_score >= 80:
+    matched = match_result.get(
+        "matchedSkills",
+        [],
+    )
+
+
+    missing = match_result.get(
+        "missingSkills",
+        [],
+    )
+
+
+    if score >= 80:
 
         level = "Strong match"
 
-    elif final_score >= 60:
+    elif score >= 60:
 
-        level = "Moderate match"
+        level = "Good match"
 
-    elif final_score >= 40:
+    elif score >= 40:
 
         level = "Partial match"
 
@@ -1515,43 +2069,58 @@ def generate_explanation(
 
         level = "Low match"
 
-    parts = []
 
-    parts.append(
-        f"{level}. "
-        f"The candidate matches "
-        f"{len(matched)} of "
-        f"{len(jd_skills)} "
-        f"identified job skills."
-    )
+    parts = [
+
+        f"{level}.",
+
+        (
+            f"The candidate matches "
+            f"{len(matched)} identified "
+            f"job skills."
+        ),
+    ]
+
 
     if matched:
 
-        preview = ", ".join(
-            matched[:8]
+        parts.append(
+            "Matching skills: "
+            +
+            ", ".join(
+                matched[:8]
+            )
+            +
+            "."
         )
 
-        parts.append(
-            f"Matching skills include "
-            f"{preview}."
-        )
 
     if missing:
 
-        preview = ", ".join(
-            missing[:8]
+        parts.append(
+            "Missing skills: "
+            +
+            ", ".join(
+                missing[:8]
+            )
+            +
+            "."
         )
 
-        parts.append(
-            f"Skills that may need "
-            f"improvement include "
-            f"{preview}."
-        )
 
     parts.append(
-        "Experience information: "
-        f"{candidate.get('experience', 'Not specified')}."
+        "Experience: "
+        +
+        str(
+            candidate.get(
+                "experience",
+                "Not specified",
+            )
+        )
+        +
+        "."
     )
+
 
     return " ".join(parts)
 
@@ -1568,29 +2137,38 @@ def process_candidate(
 
     filename = file_path.name
 
+
     print("=" * 60)
-    print(f"[PROCESSING] {filename}")
+
+    print(
+        f"[PROCESSING] {filename}"
+    )
+
 
     # --------------------------------------------------------
-    # Extract resume text
+    # Extract text
     # --------------------------------------------------------
 
     resume_text = extract_resume_text(
         file_path
     )
 
+
     print(
-        f"[TEXT LENGTH] {len(resume_text)} characters"
+        f"[TEXT LENGTH] "
+        f"{len(resume_text)} characters"
     )
+
 
     if not resume_text:
 
         print(
-            f"[WARNING] No text extracted from {filename}"
+            "[WARNING] No text extracted."
         )
 
+
     # --------------------------------------------------------
-    # Analyze candidate
+    # Candidate information
     # --------------------------------------------------------
 
     candidate = analyze_candidate(
@@ -1598,8 +2176,9 @@ def process_candidate(
         filename,
     )
 
+
     print(
-        "[CANDIDATE NAME]",
+        "[CANDIDATE]",
         candidate["name"],
     )
 
@@ -1608,84 +2187,117 @@ def process_candidate(
         candidate["skills"],
     )
 
+
     # --------------------------------------------------------
-    # Skill matching
+    # IMPORTANT: calculate ALL score components
     # --------------------------------------------------------
 
-    match_result = calculate_skill_match(
-        job_analysis["skills"],
-        candidate["skills"],
-        options.get(
-            "skillSensitivity",
-            "balanced",
-        ),
+    match_result = (
+        calculate_candidate_match(
+            job_description=
+                options.get(
+                    "jobDescription",
+                    "",
+                ),
+
+            resume_text=
+                resume_text,
+
+            jd_skills=
+                job_analysis.get(
+                    "skills",
+                    [],
+                ),
+
+            candidate_skills=
+                candidate.get(
+                    "skills",
+                    [],
+                ),
+
+            sensitivity=
+                options.get(
+                    "skillSensitivity",
+                    "balanced",
+                ),
+        )
     )
 
-    skill_score = match_result["score"]
 
-    # --------------------------------------------------------
-    # Experience
-    # --------------------------------------------------------
-
-    experience_score = calculate_experience_score(
-        options.get(
-            "jobDescription",
-            "",
-        ),
-        resume_text,
+    final_score = safe_float(
+        match_result.get(
+            "score",
+            0,
+        )
     )
 
-    # --------------------------------------------------------
-    # Final score
-    # --------------------------------------------------------
 
-    final_score = calculate_final_score(
-        skill_score,
-        experience_score,
-        options.get(
-            "jobDescription",
-            "",
-        ),
+    explanation = (
+        generate_explanation(
+            candidate,
+            match_result,
+        )
     )
 
-    # --------------------------------------------------------
-    # Explanation
-    # --------------------------------------------------------
-
-    explanation = generate_explanation(
-        candidate,
-        job_analysis,
-        match_result,
-        final_score,
-    )
 
     # --------------------------------------------------------
-    # DEBUG
+    # Debug
     # --------------------------------------------------------
 
     print(
         "[JD SKILLS]",
-        job_analysis["skills"],
+        job_analysis.get(
+            "skills",
+            [],
+        ),
     )
 
     print(
-        "[MATCHED SKILLS]",
-        match_result["matched"],
+        "[MATCHED]",
+        match_result.get(
+            "matchedSkills",
+            [],
+        ),
     )
 
     print(
-        "[MISSING SKILLS]",
-        match_result["missing"],
+        "[MISSING]",
+        match_result.get(
+            "missingSkills",
+            [],
+        ),
     )
 
     print(
         "[SKILL SCORE]",
-        skill_score,
+        match_result.get(
+            "skillScore",
+            0,
+        ),
+    )
+
+    print(
+        "[KEYWORD SCORE]",
+        match_result.get(
+            "keywordScore",
+            0,
+        ),
+    )
+
+    print(
+        "[PHRASE SCORE]",
+        match_result.get(
+            "phraseScore",
+            0,
+        ),
     )
 
     print(
         "[EXPERIENCE SCORE]",
-        experience_score,
+        match_result.get(
+            "experienceScore",
+            0,
+        ),
     )
 
     print(
@@ -1695,51 +2307,87 @@ def process_candidate(
 
     print("=" * 60)
 
+
     return {
 
-        "name": candidate["name"],
+        "name":
+            candidate["name"],
 
-        "role": candidate["role"],
+        "role":
+            candidate["role"],
 
-        "experience": candidate["experience"],
+        "experience":
+            candidate["experience"],
 
-        "location": candidate["location"],
+        "location":
+            candidate["location"],
 
-        "email": candidate["email"],
+        "email":
+            candidate["email"],
 
-        "phone": candidate["phone"],
+        "phone":
+            candidate["phone"],
 
-        "skills": candidate["skills"],
+        "skills":
+            candidate["skills"],
 
-        "matchedSkills": (
-            match_result["matched"]
-        ),
+        "matchedSkills":
+            match_result[
+                "matchedSkills"
+            ],
 
-        "missingSkills": (
-            match_result["missing"]
-        ),
+        "missingSkills":
+            match_result[
+                "missingSkills"
+            ],
 
-        "skillScore": skill_score,
+        "skillScore":
+            match_result[
+                "skillScore"
+            ],
 
-        "experienceScore": experience_score,
+        "keywordScore":
+            match_result[
+                "keywordScore"
+            ],
 
-        "matchScore": final_score,
+        "phraseScore":
+            match_result[
+                "phraseScore"
+            ],
 
-        "score": final_score,
+        "experienceScore":
+            match_result[
+                "experienceScore"
+            ],
 
-        "explanation": explanation,
+        # Frontend compatibility
+        "matchScore":
+            final_score,
 
-        "resumeFilename": filename,
+        "score":
+            final_score,
 
-        "resumeUrl": None,
+        "match_score":
+            final_score,
 
-        # Internal
-        "resumeText": resume_text,
+        "explanation":
+            explanation,
+
+        "resumeFilename":
+            filename,
+
+        "resumeUrl":
+            None,
+
+        # Internal only
+        "resumeText":
+            resume_text,
     }
 
 
 # ============================================================
-# UPDATE SCREENING
+# SCREENING UPDATE
 # ============================================================
 
 def update_screening(
@@ -1756,7 +2404,9 @@ def update_screening(
         if not screening:
             return
 
-        screening.update(values)
+        screening.update(
+            values
+        )
 
 
 # ============================================================
@@ -1778,17 +2428,24 @@ def run_screening(
             if not screening:
                 return
 
-            job_description = screening[
-                "jobDescription"
-            ]
+            job_description = (
+                screening[
+                    "jobDescription"
+                ]
+            )
 
             options = dict(
-                screening["options"]
+                screening[
+                    "options"
+                ]
             )
 
             files = list(
-                screening["files"]
+                screening[
+                    "files"
+                ]
             )
+
 
         # ----------------------------------------------------
         # STEP 1
@@ -1797,38 +2454,53 @@ def run_screening(
         update_screening(
             screening_id,
 
-            currentStep="readingJobDescription",
+            currentStep=
+                "readingJobDescription",
 
             progress=10,
 
-            statusMessage=(
-                "Reading job description..."
-            ),
+            statusMessage=
+                "Reading job description...",
         )
 
-        job_analysis = analyze_job_description(
-            job_description
+
+        job_analysis = (
+            analyze_job_description(
+                job_description
+            )
         )
 
-        options["jobDescription"] = (
-            job_description
-        )
+
+        options[
+            "jobDescription"
+        ] = job_description
+
 
         print("=" * 60)
-        print("[JOB DESCRIPTION ANALYSIS]")
+
         print(
             "[JOB ROLE]",
-            job_analysis["role"],
+            job_analysis[
+                "role"
+            ],
         )
+
         print(
             "[JOB SKILLS]",
-            job_analysis["skills"],
+            job_analysis[
+                "skills"
+            ],
         )
+
         print(
             "[REQUIRED YEARS]",
-            job_analysis["requiredYears"],
+            job_analysis[
+                "requiredYears"
+            ],
         )
+
         print("=" * 60)
+
 
         # ----------------------------------------------------
         # STEP 2
@@ -1837,14 +2509,15 @@ def run_screening(
         update_screening(
             screening_id,
 
-            currentStep="uploadingCvs",
+            currentStep=
+                "uploadingCvs",
 
             progress=25,
 
-            statusMessage=(
-                "Preparing resumes..."
-            ),
+            statusMessage=
+                "Preparing resumes...",
         )
+
 
         # ----------------------------------------------------
         # STEP 3
@@ -1852,9 +2525,14 @@ def run_screening(
 
         candidates = []
 
-        total_files = len(files)
+        total_files = len(
+            files
+        )
 
-        for index, file_info in enumerate(files):
+
+        for index, file_info in (
+            enumerate(files)
+        ):
 
             filename = file_info[
                 "filename"
@@ -1864,28 +2542,36 @@ def run_screening(
                 file_info["path"]
             )
 
+
             progress = (
                 30
-                + (
-                    (index + 1)
-                    / max(total_files, 1)
+                +
+                (
+                    (
+                        index + 1
+                    )
+                    /
+                    max(
+                        total_files,
+                        1,
+                    )
                 )
-                * 25
+                * 30
             )
+
 
             update_screening(
                 screening_id,
 
-                currentStep=(
-                    "extractingInformation"
-                ),
+                currentStep=
+                    "extractingInformation",
 
                 progress=progress,
 
-                statusMessage=(
-                    f"Reading {filename}..."
-                ),
+                statusMessage=
+                    f"Reading {filename}...",
             )
+
 
             result = process_candidate(
                 path,
@@ -1893,13 +2579,22 @@ def run_screening(
                 options,
             )
 
+
             result["resumeUrl"] = (
                 "/api/files/"
-                f"{screening_id}/"
-                f"{filename}"
+                +
+                screening_id
+                +
+                "/"
+                +
+                filename
             )
 
-            candidates.append(result)
+
+            candidates.append(
+                result
+            )
+
 
         # ----------------------------------------------------
         # STEP 4
@@ -1908,14 +2603,15 @@ def run_screening(
         update_screening(
             screening_id,
 
-            currentStep="matchingSkills",
+            currentStep=
+                "matchingSkills",
 
-            progress=65,
+            progress=70,
 
-            statusMessage=(
-                "Matching candidate skills..."
-            ),
+            statusMessage=
+                "Matching candidate skills...",
         )
+
 
         # ----------------------------------------------------
         # STEP 5
@@ -1924,14 +2620,15 @@ def run_screening(
         update_screening(
             screening_id,
 
-            currentStep="calculatingScore",
+            currentStep=
+                "calculatingScore",
 
-            progress=80,
+            progress=85,
 
-            statusMessage=(
-                "Calculating candidate scores..."
-            ),
+            statusMessage=
+                "Calculating candidate scores...",
         )
+
 
         candidates.sort(
             key=lambda candidate:
@@ -1947,21 +2644,6 @@ def run_screening(
             reverse=True,
         )
 
-        # ----------------------------------------------------
-        # STEP 6
-        # ----------------------------------------------------
-
-        update_screening(
-            screening_id,
-
-            currentStep="generatingExplanation",
-
-            progress=92,
-
-            statusMessage=(
-                "Generating explanations..."
-            ),
-        )
 
         # ----------------------------------------------------
         # COMPLETE
@@ -1978,25 +2660,28 @@ def run_screening(
 
             currentStep="completed",
 
-            statusMessage=(
-                "Screening completed successfully."
-            ),
+            statusMessage=
+                "Screening completed successfully.",
 
-            completedAt=(
-                datetime.utcnow().isoformat()
-            ),
+            completedAt=
+                datetime.utcnow().isoformat(),
+        )
+
+
+        print("=" * 60)
+
+        print(
+            "[SUCCESS] Screening completed:",
+            screening_id,
+        )
+
+        print(
+            "[CANDIDATES]",
+            len(candidates),
         )
 
         print("=" * 60)
-        print(
-            f"[SUCCESS] Screening "
-            f"{screening_id} completed."
-        )
-        print(
-            f"[SUCCESS] Candidates: "
-            f"{len(candidates)}"
-        )
-        print("=" * 60)
+
 
     except Exception as exc:
 
@@ -2009,9 +2694,8 @@ def run_screening(
 
             currentStep="error",
 
-            statusMessage=(
-                f"Processing failed: {exc}"
-            ),
+            statusMessage=
+                f"Processing failed: {exc}",
 
             error=str(exc),
         )
@@ -2025,102 +2709,140 @@ def run_screening(
 def root():
 
     return {
-        "service": "ResumeAI Backend",
-        "status": "running",
-        "framework": "FastAPI",
-        "version": "3.0.0",
-        "docs": "/docs",
-        "health": "/api/health",
+
+        "service":
+            "ResumeAI Backend",
+
+        "status":
+            "running",
+
+        "framework":
+            "FastAPI",
+
+        "version":
+            "4.0.0",
+
+        "docs":
+            "/docs",
+
+        "health":
+            "/api/health",
     }
 
 
 # ============================================================
 # HEALTH
 # ============================================================
-
 @app.get("/api/health")
 def health():
 
     return {
         "status": "ok",
-        "service": "ResumeAI Backend",
-        "framework": "FastAPI",
-        "version": "3.0.0",
-    }
 
+        "service": "ResumeAI Backend",
+
+        "framework": "FastAPI",
+
+        "version": "4.0.0",
+
+        "pdfExtractor":
+            "PyPDF2"
+            if PdfReader
+            else None,
+
+        "docxExtractor":
+            bool(Document),
+
+        "ocr":
+            bool(pytesseract),
+
+        # "pymupdf":
+            # False,
+    }
 
 # ============================================================
 # CREATE SCREENING
 # ============================================================
 
-@app.post("/api/screenings")
+@app.post(
+    "/api/screenings"
+)
 def create_screening(
     data: CreateScreeningRequest,
 ):
 
     job_description = (
-        data.jobDescription or ""
+        data.jobDescription
+        or ""
     ).strip()
+
 
     if not job_description:
 
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Job description is required."
-            ),
+            detail=
+                "Job description is required.",
         )
 
-    options = data.options
 
-    if options is None:
-        options = ScreeningOptions()
+    options = (
+        data.options
+        or ScreeningOptions()
+    )
+
 
     screening_id = generate_id()
 
+
     screening = {
 
-        "id": screening_id,
+        "id":
+            screening_id,
 
-        "createdAt": (
-            datetime.utcnow().isoformat()
-        ),
+        "createdAt":
+            datetime.utcnow().isoformat(),
 
-        "jobDescription": job_description,
+        "jobDescription":
+            job_description,
 
         "options": {
 
-            "minMatchScore": (
-                options.minMatchScore
-            ),
+            "minMatchScore":
+                options.minMatchScore,
 
-            "skillSensitivity": (
-                options.skillSensitivity
-            ),
+            "skillSensitivity":
+                options.skillSensitivity,
 
-            "aiExplanation": (
-                options.aiExplanation
-            ),
+            "aiExplanation":
+                options.aiExplanation,
         },
 
-        "status": "created",
+        "status":
+            "created",
 
-        "progress": 0,
+        "progress":
+            0,
 
-        "currentStep": None,
+        "currentStep":
+            None,
 
-        "statusMessage": (
-            "Screening created."
-        ),
+        "statusMessage":
+            "Screening created.",
 
-        "error": None,
+        "error":
+            None,
 
-        "files": [],
+        "files":
+            [],
 
-        "candidates": [],
+        "candidates":
+            [],
 
-        "completedAt": None,
+        "completedAt":
+            None,
     }
+
 
     with lock:
 
@@ -2128,13 +2850,20 @@ def create_screening(
             screening_id
         ] = screening
 
+
     print(
-        f"[SCREENING CREATED] "
-        f"{screening_id}"
+        "[SCREENING CREATED]",
+        screening_id,
     )
 
+
     return {
-        "screeningId": screening_id
+
+        "screeningId":
+            screening_id,
+
+        "id":
+            screening_id,
     }
 
 
@@ -2147,8 +2876,11 @@ def create_screening(
 )
 async def upload_resumes(
     screening_id: str,
-    background_tasks: BackgroundTasks,
-    resumes: List[UploadFile] = File(...),
+    background_tasks:
+        BackgroundTasks,
+
+    resumes:
+        List[UploadFile] = File(...),
 ):
 
     with lock:
@@ -2157,52 +2889,64 @@ async def upload_resumes(
             screening_id
         )
 
+
     if not screening:
 
         raise HTTPException(
             status_code=404,
-            detail="Screening not found.",
+            detail=
+                "Screening not found.",
         )
+
 
     if not resumes:
 
         raise HTTPException(
             status_code=400,
-            detail=(
-                "No resume files were uploaded."
-            ),
+            detail=
+                "No resume files were uploaded.",
         )
 
+
     screening_dir = (
-        UPLOAD_DIR / screening_id
+        UPLOAD_DIR
+        /
+        screening_id
     )
+
 
     screening_dir.mkdir(
         parents=True,
         exist_ok=True,
     )
 
+
     saved_files = []
+
 
     for uploaded_file in resumes:
 
         if not uploaded_file.filename:
+
             continue
+
 
         original_name = Path(
             uploaded_file.filename
         ).name
+
 
         if not allowed_file(
             original_name
         ):
 
             print(
-                f"[SKIPPED] Unsupported file: "
-                f"{original_name}"
+                "[SKIPPED] Unsupported:",
+                original_name,
             )
 
             continue
+
 
         safe_name = re.sub(
             r"[^A-Za-z0-9._-]",
@@ -2210,18 +2954,22 @@ async def upload_resumes(
             original_name,
         )
 
-        unique_prefix = (
-            uuid.uuid4().hex[:8]
-        )
 
         stored_name = (
-            f"{unique_prefix}_"
-            f"{safe_name}"
+            uuid.uuid4().hex[:8]
+            +
+            "_"
+            +
+            safe_name
         )
 
+
         save_path = (
-            screening_dir / stored_name
+            screening_dir
+            /
+            stored_name
         )
+
 
         try:
 
@@ -2229,62 +2977,86 @@ async def upload_resumes(
                 uploaded_file.read()
             )
 
-            if len(content) > MAX_FILE_BYTES:
+
+            if len(content) > (
+                MAX_FILE_BYTES
+            ):
 
                 print(
-                    f"[SKIPPED] File too large: "
-                    f"{original_name}"
+                    "[SKIPPED] Too large:",
+                    original_name,
                 )
 
                 continue
+
+
+            if len(content) == 0:
+
+                print(
+                    "[SKIPPED] Empty:",
+                    original_name,
+                )
+
+                continue
+
 
             with open(
                 save_path,
                 "wb",
             ) as output_file:
 
-                output_file.write(content)
+                output_file.write(
+                    content
+                )
 
-            saved_files.append(
-                {
-                    "filename": stored_name,
 
-                    "originalFilename":
-                        original_name,
+            saved_files.append({
 
-                    "path":
-                        str(save_path),
-                }
-            )
+                "filename":
+                    stored_name,
+
+                "originalFilename":
+                    original_name,
+
+                "path":
+                    str(save_path),
+            })
+
 
             print(
-                f"[UPLOADED] "
-                f"{original_name}"
+                "[UPLOADED]",
+                original_name,
             )
+
 
         except Exception as exc:
 
             print(
-                f"[UPLOAD ERROR] "
-                f"{original_name}: "
-                f"{exc}"
+                "[UPLOAD ERROR]",
+                original_name,
+                exc,
             )
+
 
     if not saved_files:
 
         raise HTTPException(
             status_code=400,
+
             detail={
                 "message":
                     "No valid resume files were uploaded.",
 
                 "allowedExtensions":
-                    sorted(ALLOWED_EXTENSIONS),
+                    sorted(
+                        ALLOWED_EXTENSIONS
+                    ),
 
                 "maxFileSizeMB":
                     MAX_FILE_MB,
             },
         )
+
 
     update_screening(
         screening_id,
@@ -2295,20 +3067,23 @@ async def upload_resumes(
 
         progress=5,
 
-        currentStep="uploadingCvs",
+        currentStep=
+            "uploadingCvs",
 
-        statusMessage=(
+        statusMessage=
             "Files uploaded. "
-            "Starting screening..."
-        ),
+            "Starting screening...",
     )
+
 
     background_tasks.add_task(
         run_screening,
         screening_id,
     )
 
+
     return {
+
         "message":
             "Resumes uploaded successfully.",
 
@@ -2321,7 +3096,7 @@ async def upload_resumes(
 
 
 # ============================================================
-# SCREENING STATUS
+# STATUS
 # ============================================================
 
 @app.get(
@@ -2337,12 +3112,15 @@ def screening_status(
             screening_id
         )
 
+
     if not screening:
 
         raise HTTPException(
             status_code=404,
-            detail="Screening not found.",
+            detail=
+                "Screening not found.",
         )
+
 
     return {
 
@@ -2365,10 +3143,14 @@ def screening_status(
             screening["error"],
 
         "total":
-            len(screening["files"]),
+            len(
+                screening["files"]
+            ),
 
         "completed":
-            len(screening["candidates"]),
+            len(
+                screening["candidates"]
+            ),
 
         "createdAt":
             screening["createdAt"],
@@ -2379,7 +3161,7 @@ def screening_status(
 
 
 # ============================================================
-# GET ONE CANDIDATE
+# GET CANDIDATE
 # ============================================================
 
 @app.get(
@@ -2400,12 +3182,14 @@ def get_candidate(
 
             raise HTTPException(
                 status_code=404,
-                detail="Screening not found.",
+                detail=
+                    "Screening not found.",
             )
 
         candidates = list(
             screening["candidates"]
         )
+
 
     if (
         index < 0
@@ -2414,41 +3198,55 @@ def get_candidate(
 
         raise HTTPException(
             status_code=404,
-            detail="Candidate not found.",
+            detail=
+                "Candidate not found.",
         )
+
 
     candidate = dict(
         candidates[index]
     )
 
-    # Never expose raw resume text
+
     candidate.pop(
         "resumeText",
         None,
     )
 
-    if "matchScore" not in candidate:
 
-        candidate["matchScore"] = (
-            safe_float(
-                candidate.get(
-                    "score",
-                    0,
-                )
-            )
+    score = safe_float(
+        candidate.get(
+            "matchScore",
+            candidate.get(
+                "score",
+                0,
+            ),
         )
+    )
 
-    if "score" not in candidate:
 
-        candidate["score"] = (
-            candidate["matchScore"]
-        )
+    candidate["matchScore"] = round(
+        clamp(score),
+        1,
+    )
+
+
+    candidate["score"] = (
+        candidate["matchScore"]
+    )
+
+
+    candidate["match_score"] = (
+        candidate["matchScore"]
+    )
+
 
     candidate["index"] = index
 
     candidate["total"] = len(
         candidates
     )
+
 
     return candidate
 
@@ -2474,7 +3272,8 @@ def get_summary(
 
             raise HTTPException(
                 status_code=404,
-                detail="Screening not found.",
+                detail=
+                    "Screening not found.",
             )
 
         candidates = list(
@@ -2485,46 +3284,59 @@ def get_summary(
             screening["options"]
         )
 
-    normalized_candidates = []
+
+    normalized = []
+
 
     for candidate in candidates:
 
-        candidate_copy = dict(
+        item = dict(
             candidate
         )
 
-        candidate_copy.pop(
+
+        item.pop(
             "resumeText",
             None,
         )
 
+
         score = safe_float(
-            candidate_copy.get(
+            item.get(
                 "matchScore",
-                candidate_copy.get(
+                item.get(
                     "score",
                     0,
                 ),
             )
         )
 
-        candidate_copy["matchScore"] = round(
+
+        item["matchScore"] = round(
             clamp(score),
             1,
         )
 
-        candidate_copy["score"] = (
-            candidate_copy["matchScore"]
+
+        item["score"] = (
+            item["matchScore"]
         )
 
-        normalized_candidates.append(
-            candidate_copy
+
+        item["match_score"] = (
+            item["matchScore"]
         )
 
-    normalized_candidates.sort(
-        key=lambda candidate:
+
+        normalized.append(
+            item
+        )
+
+
+    normalized.sort(
+        key=lambda x:
             safe_float(
-                candidate.get(
+                x.get(
                     "matchScore",
                     0,
                 )
@@ -2532,11 +3344,13 @@ def get_summary(
         reverse=True,
     )
 
+
     total = len(
-        normalized_candidates
+        normalized
     )
 
-    min_score = safe_float(
+
+    minimum = safe_float(
         options.get(
             "minMatchScore",
             60,
@@ -2544,50 +3358,45 @@ def get_summary(
         60,
     )
 
+
     strong_matches = [
-        candidate
-        for candidate in normalized_candidates
+        x
+        for x in normalized
         if safe_float(
-            candidate.get(
+            x.get(
                 "matchScore",
                 0,
             )
-        ) >= min_score
+        ) >= minimum
     ]
+
 
     scores = [
         safe_float(
-            candidate.get(
+            x.get(
                 "matchScore",
                 0,
             )
         )
-        for candidate
-        in normalized_candidates
+        for x in normalized
     ]
 
-    average_match = (
-        sum(scores) / len(scores)
+
+    average = (
+        sum(scores)
+        /
+        len(scores)
         if scores
         else 0
     )
 
-    top_candidate = (
-        normalized_candidates[0]
-        if normalized_candidates
+
+    top = (
+        normalized[0]
+        if normalized
         else None
     )
 
-    top_match = (
-        safe_float(
-            top_candidate.get(
-                "matchScore",
-                0,
-            )
-        )
-        if top_candidate
-        else 0
-    )
 
     return {
 
@@ -2608,52 +3417,59 @@ def get_summary(
 
         "averageMatch":
             round(
-                average_match,
+                average,
                 1,
             ),
 
         "topMatch":
             round(
-                top_match,
+                safe_float(
+                    top.get(
+                        "matchScore",
+                        0,
+                    )
+                )
+                if top
+                else 0,
                 1,
             ),
 
         "topCandidate":
             {
                 "name":
-                    top_candidate.get(
+                    top.get(
                         "name",
                         "Unknown Candidate",
                     ),
 
                 "score":
-                    top_candidate.get(
+                    top.get(
                         "matchScore",
                         0,
                     ),
 
                 "matchScore":
-                    top_candidate.get(
+                    top.get(
                         "matchScore",
                         0,
                     ),
 
                 "role":
-                    top_candidate.get(
+                    top.get(
                         "role",
                         "Candidate",
                     ),
             }
-            if top_candidate
+            if top
             else None,
 
         "candidates":
-            normalized_candidates,
+            normalized,
     }
 
 
 # ============================================================
-# SERVE RESUME
+# SERVE RESUME FILE
 # ============================================================
 
 @app.get(
@@ -2665,37 +3481,49 @@ def serve_file(
 ):
 
     screening_dir = (
-        UPLOAD_DIR / screening_id
+        UPLOAD_DIR
+        /
+        screening_id
     )
+
 
     if not screening_dir.exists():
 
         raise HTTPException(
             status_code=404,
-            detail="Screening files not found.",
+            detail=
+                "Screening files not found.",
         )
+
 
     safe_filename = Path(
         filename
     ).name
 
+
     requested_file = (
-        screening_dir / safe_filename
+        screening_dir
+        /
+        safe_filename
     )
+
 
     if not requested_file.exists():
 
         raise HTTPException(
             status_code=404,
-            detail="Resume file not found.",
+            detail=
+                "Resume file not found.",
         )
+
 
     return FileResponse(
         path=str(
             requested_file
         ),
         filename=safe_filename,
-        content_disposition_type="inline",
+        content_disposition_type=
+            "inline",
     )
 
 
@@ -2712,42 +3540,46 @@ def list_screenings():
 
         result = []
 
-        for screening in screenings.values():
+        for screening in (
+            screenings.values()
+        ):
 
-            result.append(
-                {
-                    "id":
-                        screening["id"],
+            result.append({
 
-                    "createdAt":
-                        screening["createdAt"],
+                "id":
+                    screening["id"],
 
-                    "status":
-                        screening["status"],
+                "createdAt":
+                    screening["createdAt"],
 
-                    "progress":
-                        screening["progress"],
+                "status":
+                    screening["status"],
 
-                    "total":
-                        len(
-                            screening["files"]
-                        ),
+                "progress":
+                    screening["progress"],
 
-                    "completed":
-                        len(
-                            screening["candidates"]
-                        ),
-                }
-            )
+                "total":
+                    len(
+                        screening["files"]
+                    ),
+
+                "completed":
+                    len(
+                        screening["candidates"]
+                    ),
+            })
+
 
     result.sort(
-        key=lambda item:
-            item["createdAt"],
+        key=lambda x:
+            x["createdAt"],
         reverse=True,
     )
 
+
     return {
-        "screenings": result
+        "screenings":
+            result
     }
 
 
@@ -2768,35 +3600,48 @@ def delete_screening(
 
             raise HTTPException(
                 status_code=404,
-                detail="Screening not found.",
+                detail=
+                    "Screening not found.",
             )
 
         del screenings[
             screening_id
         ]
 
+
     screening_dir = (
-        UPLOAD_DIR / screening_id
+        UPLOAD_DIR
+        /
+        screening_id
     )
+
 
     if screening_dir.exists():
 
-        for file in screening_dir.iterdir():
+        for file in (
+            screening_dir.iterdir()
+        ):
 
             try:
 
                 if file.is_file():
+
                     file.unlink()
 
             except Exception:
                 pass
 
+
         try:
+
             screening_dir.rmdir()
+
         except Exception:
             pass
 
+
     return {
+
         "message":
             "Screening deleted successfully.",
 
@@ -2806,7 +3651,7 @@ def delete_screening(
 
 
 # ============================================================
-# ERROR HANDLER
+# GLOBAL ERROR HANDLER
 # ============================================================
 
 @app.exception_handler(Exception)
@@ -2817,9 +3662,12 @@ async def global_exception_handler(
 
     traceback.print_exc()
 
+
     return JSONResponse(
         status_code=500,
+
         content={
+
             "message":
                 "Internal server error.",
 
@@ -2837,12 +3685,18 @@ if __name__ == "__main__":
 
     import uvicorn
 
-    print("=" * 60)
-    print("ResumeAI FastAPI Backend")
+
     print("=" * 60)
 
     print(
-        f"Upload directory: {UPLOAD_DIR}"
+        "ResumeAI FastAPI Backend"
+    )
+
+    print("=" * 60)
+
+    print(
+        f"Upload directory: "
+        f"{UPLOAD_DIR}"
     )
 
     print(
@@ -2855,21 +3709,29 @@ if __name__ == "__main__":
     )
 
     print(
-        "Server: "
-        "http://127.0.0.1:5000"
+        "PDF extractor:",
+        "PyPDF2"
+        if PdfReader
+        else "NOT INSTALLED",
     )
 
     print(
-        "Swagger: "
-        "http://127.0.0.1:5000/docs"
+        "Server:",
+        "http://127.0.0.1:5000",
     )
 
     print(
-        "Health: "
-        "http://127.0.0.1:5000/api/health"
+        "Swagger:",
+        "http://127.0.0.1:5000/docs",
+    )
+
+    print(
+        "Health:",
+        "http://127.0.0.1:5000/api/health",
     )
 
     print("=" * 60)
+
 
     uvicorn.run(
         app,
