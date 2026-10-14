@@ -1,6 +1,6 @@
-# 📄 CV Scanner
+# 📄 CV Resume Screener
 
-An AI-powered CV/resume scanner that helps screen resumes quickly and consistently.
+An AI-powered resume screening system that helps recruiters upload CVs, screen candidates and view summaries in one place.
 
 ![Recognition](https://img.shields.io/badge/🏆_1st_Runner--Up-AI--Buildthon_2.0-brightgreen?style=for-the-badge)
 
@@ -12,79 +12,87 @@ An AI-powered CV/resume scanner that helps screen resumes quickly and consistent
 
 ## 📌 About the Project
 
-CV Scanner lets a user upload a resume and get a quick screening result, so recruiters don't have to read every CV manually. The frontend is built with plain HTML, CSS and JavaScript, and is designed to connect to an AI/ML backend.
+CV Resume Screener lets a user upload resumes, screen candidates automatically and review the results through a simple web interface. The project has a **Python backend** that handles resume uploads and processing, and a **frontend** built with HTML, CSS and vanilla JavaScript.
 
 ## ✨ Features
 
-- Upload a resume (PDF/DOCX) through a clean interface
-- Extract key details such as skills, education and experience
-- Match the resume against a job description
-- Show a screening score and summary
-- Responsive layout for desktop and mobile
+- Upload resumes through the web interface
+- Candidate listing and candidate detail view
+- Resume screening with results
+- Summary page for screening outcomes
+- Settings page to configure the screening
+- Clean, responsive UI
 
 > Edit this list so it matches exactly what your project does.
 
 ## 🛠️ Tech Stack
 
-| Layer    | Technology                          |
-|----------|-------------------------------------|
-| Frontend | HTML, CSS, Vanilla JavaScript       |
-| Backend  | [Add your backend / AI model here]  |
-| Hosting  | [Netlify / GitHub Pages / other]    |
+| Layer    | Technology                                   |
+|----------|----------------------------------------------|
+| Frontend | HTML, CSS, Vanilla JavaScript                |
+| Backend  | Python ([FastAPI / Flask – update this])     |
+| AI / ML  | [Add model / library used, e.g. spaCy, scikit-learn, LLM API] |
 
 ## 📁 Project Structure
 
 ```
-cv-scanner/
-├── index.html
-├── css/
-│   └── style.css
-├── js/
-│   └── script.js
-├── assets/
-│   └── screenshots/
+CV-Resume-Screener/
+├── backend/
+│   └── app/
+│       ├── main.py          # Backend entry point
+│       └── uploads/         # Uploaded resumes
+├── frontend/
+│   ├── index.html           # Home / upload page
+│   ├── candidate.html       # Candidate details
+│   ├── screening.html       # Screening page
+│   ├── summary.html         # Screening summary
+│   ├── settings.html        # Settings
+│   ├── script.js            # Frontend logic
+│   ├── style.css            # Styling
+│   └── README.md
 └── README.md
 ```
 
 ## 🚀 Getting Started
 
+### 1. Clone the repository
+
 ```bash
-# 1. Clone the repository
-git clone https://github.com/<your-username>/<repo-name>.git
-
-# 2. Go into the folder
-cd <repo-name>
-
-# 3. Open index.html in your browser
-#    or use a local server such as VS Code Live Server
+git clone https://github.com/<owner>/CV-Resume-Screener.git
+cd CV-Resume-Screener
 ```
 
-## 📸 Screenshots
+### 2. Run the backend
 
-| Home | Result |
-|------|--------|
-| ![Home](assets/screenshots/home.png) | ![Result](assets/screenshots/result.png) |
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+> Use the command that matches your framework (for Flask: `python app/main.py`).
+
+### 3. Run the frontend
+
+Open `frontend/index.html` in your browser, or use VS Code Live Server.
 
 ## 🏆 Recognition
 
-- **1st Runner-Up** at **AI-Buildthon 2.0**, GRD IMT Dehradun (2026)
+- **1st Runner-Up** at **AI-Buildthon 2.0**, GRD Uttarakhand University Dehradun (2026)
 
 ## 🔮 Future Improvements
 
-- Connect the frontend to a trained AI/ML backend
-- Support bulk resume uploads
-- Add ranking of multiple candidates
+- Bulk resume upload and ranking
+- Better skill extraction and job-description matching
 - Export screening reports
+- User login and saved sessions
 
 ## 👥 Team
 
-- [Your Name](https://github.com/<your-username>) – [your role]
-- [Teammate name] – [role] *(remove if solo project)*
-
-## 📬 Contact
-
-- GitHub: [@<your-username>](https://github.com/<your-username>)
-- LinkedIn: [your-link]
+- [Vansh Aroa](https://github.com/aroravansh-cyber) – Team Lead, Frontend Lead
+- [Nitin Singh](https://github.com/nitinsingh-06) – Backend Lead & Developer
+- [Ayushi Panwar](https://github.com/Ayushi5491) – Frontend Developer
+- [Akash Anthwal](https://github.com/akashanthwal99-max) – Documentaion
 
 ## 📄 License
 
